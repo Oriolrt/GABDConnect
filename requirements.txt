@@ -1,6 +1,8 @@
+paramiko>=3.4.1          # Per evitar els avisos de TripleDES i Blowfish
+sshtunnel>=0.4.0         # Última versió disponible
+cryptography<48          # Per evitar que TripleDES/Blowfish desapareguin (veure advertiment). Ajustable si és necessari.
 oracleDB
 pymongo
-sshtunnel
 scikit-learn
 tqdm
 matplotlib
