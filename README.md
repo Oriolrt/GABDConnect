@@ -1,5 +1,5 @@
 # Practiques GABD
-Aquest repositori conté un petit paquet que permet fer connexions a servidors Oracle directament, amb la llibreria __oracledb__, i a través de tunel ssh, fent servir la llibreria sshtunnel.
+Aquest repositori conté un petit paquet que permet fer connexions a servidors Oracle directament, amb la llibreria __oracledb__, i a través de tunel ssh.
 
 ## Connexió directe a Oracle
 Cal indicar les següents dades:
