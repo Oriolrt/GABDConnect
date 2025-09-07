@@ -20,8 +20,8 @@ warnings.filterwarnings(
 )
 
 
-#from .ssh_tunnel import sshTunnel
-from sshtunnel import SSHTunnelForwarder as sshTunnel
+from .ssh_tunnel import sshTunnel
+#from sshtunnel import SSHTunnelForwarder as sshTunnel
 
 from getpass import getpass
 

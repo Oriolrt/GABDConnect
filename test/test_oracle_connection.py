@@ -33,7 +33,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
 
     if os.path.isfile(f"../dev_keys/id_{SSH_USER}"):
-      id_key = f"dev_keys/id_{SSH_USER}"
+      id_key = f"../dev_keys/id_{SSH_USER}"
       ssh_server = {'ssh': ssh_tunnel, 'user': SSH_USER,
                     'id_key': id_key, 'port': port} if ssh_tunnel is not None else None
 
