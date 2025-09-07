@@ -3,6 +3,9 @@ import socket
 import threading
 import select
 
+
+
+
 class sshTunnel:
     def __init__(self, ssh_address_or_host, ssh_port=22,
                  ssh_username=None, ssh_password=None, ssh_pkey=None,
@@ -22,7 +25,7 @@ class sshTunnel:
 
         # Si no hi ha local binds, assigna automàticament
         if not self.local_bind_addresses:
-            self.local_bind_addresses = [("127.0.0.1", 0)] * len(self.remote_bind_addresses)
+            self.local_bind_addresses = [("localhost", 0)] * len(self.remote_bind_addresses)
 
         self.client = None
         self.transport = None
@@ -38,6 +41,64 @@ class sshTunnel:
         # Compatibilitat amb codi que espera un únic port
         ports = self.local_bind_ports
         return ports[0] if ports else None
+
+    def forward_tunnel(self,local_port, remote_host, remote_port):
+        """Crea el túnel local cap a Oracle via SSH."""
+
+        class Handler(threading.Thread):
+            def __init__(self, chan, sock):
+                threading.Thread.__init__(self)
+                self.chan = chan
+                self.sock = sock
+
+            def run(self):
+                try:
+                    while True:
+                        r, w, x = select.select([self.sock, self.chan], [], [])
+                        if self.sock in r:
+                            data = self.sock.recv(1024)
+                            if len(data) == 0:
+                                break
+                            self.chan.send(data)
+                        if self.chan in r:
+                            data = self.chan.recv(1024)
+                            if len(data) == 0:
+                                break
+                            self.sock.send(data)
+                except Exception as e:
+                    print(f"⚠️ Error forwarding: {e}")
+                finally:
+                    try:
+                        self.chan.close()
+                    except Exception:
+                        pass
+                    try:
+                        self.sock.close()
+                    except Exception:
+                        pass
+
+
+        def accept(sock):
+            while True:
+                try:
+                    client, addr = sock.accept()
+                except OSError:
+                    # El socket s'ha tancat → sortir del bucle
+                    break
+
+                chan = self.transport.open_channel("direct-tcpip",
+                                              (remote_host, remote_port),
+                                              client.getpeername())
+                thr = Handler(chan, client)
+                thr.daemon = True
+                thr.start()
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("localhost", local_port))
+        sock.listen(100)
+        threading.Thread(target=accept, args=(sock,), daemon=True).start()
+        self._sockets.append(sock)
 
     def start(self):
         self.client = paramiko.SSHClient()
@@ -56,16 +117,18 @@ class sshTunnel:
             local_host, local_port = local_bind
             remote_host, remote_port = remote_bind
 
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind((local_host, local_port))
-            local_port = sock.getsockname()[1]
-            sock.listen(100)
-            self._sockets.append(sock)
+            self.forward_tunnel(local_port, remote_host, remote_port)
 
-            thread = threading.Thread(target=self._forward, args=(sock, remote_host, remote_port), daemon=True)
-            thread.start()
-            self._threads.append(thread)
+            #sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            #sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            #sock.bind((local_host, local_port))
+            #local_port = sock.getsockname()[1]
+            #sock.listen(100)
+            #self._sockets.append(sock)
+
+            #thread = threading.Thread(target=self._forward, args=(sock, remote_host, remote_port), daemon=True)
+            #thread.start()
+            #self._threads.append(thread)
 
     def stop(self):
         for sock in self._sockets:
@@ -107,8 +170,7 @@ class sshTunnel:
 
     def is_active(self, timeout=2):
         """
-        Comprova si el túnel SSH està actiu provant de connectar-se
-        a cada port local assignat.
+        Comprova si el túnel SSH està actiu provant de connectar-se a cada port local assignat.
         Retorna True si almenys un túnel està viu.
         """
 
