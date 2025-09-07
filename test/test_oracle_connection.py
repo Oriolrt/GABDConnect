@@ -6,7 +6,8 @@ import os
 
 class OracleConnectTestCase(unittest.TestCase):
   def setUp(self):
-    self.ssh_server = {'ssh': "dcccluster.uab.cat" , 'user': "student", 'id_key': "dev_keys/id_student", 'port': 8192}
+    self.ssh_server = {'ssh': "dcccluster.uab.cat" , 'user': "student", 'id_key': "../dev_keys/id_student", 'port': 8192}
+    #self.ssh_server = {'ssh': "dcccluster.uab.cat", 'user': "student", 'port': 8192}
     self.hostname = "oracle-1.grup00.gabd"
     self.port = 1521
     self.serviceName = "FREEPDB1"
@@ -54,7 +55,7 @@ class OracleConnectTestCase(unittest.TestCase):
     self.assertEqual(False, db.isStarted,
                      f"Database should be close and is {db.isStarted}")  # add assertion here
   def test_consulta_basica_connection(self):
-    self._local_port = 1522
+    self._local_port = 1521
     self.client = orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
                        passwd=self.pwd, serviceName=self.serviceName,local_port=self._local_port)
     self.client.open()

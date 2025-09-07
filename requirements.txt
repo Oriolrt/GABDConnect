@@ -1,5 +1,6 @@
-paramiko<3          
-sshtunnel>=0.4.0         # Última versió disponible
+paramiko<3
+sshtunnel>=0.4.0      # Última versió disponible
+cryptography<48.0.0   # Última versió compatible amb sshtunnel
 oracleDB
 pymongo
 scikit-learn

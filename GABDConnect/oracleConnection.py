@@ -51,7 +51,6 @@ class oracleConnection(AbsConnection):
 
     AbsConnection.__init__(self,**params)
 
-    #self._dsn = f"{self.user}/{self.pwd}@{self.hostname}:{self._local_port}/{self._serviceName}"
     self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
 
 

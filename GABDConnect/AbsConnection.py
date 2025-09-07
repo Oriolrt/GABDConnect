@@ -12,8 +12,17 @@ Aquest script forma part del material didàctic de l'assignatura de Gestió i Ad
 
 from abc import ABC, abstractmethod
 
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=DeprecationWarning,
+    module="pydevd"
+)
 
-from sshtunnel import SSHTunnelForwarder
+
+#from .ssh_tunnel import sshTunnel
+from sshtunnel import SSHTunnelForwarder as sshTunnel
+
 from getpass import getpass
 
 def _format_multiple_tunnels( mt : dict) -> bool:
@@ -117,7 +126,7 @@ class GABDSSHTunnel:
         ssh_data = self._ssh_data
         if ssh_data is not None:
           if "id_key" in ssh_data:
-            GABDSSHTunnel._server = SSHTunnelForwarder(
+            GABDSSHTunnel._server = sshTunnel(
                 (ssh_data["ssh"], int(ssh_data['port'])),
                 ssh_username=ssh_data["user"],
                 ssh_pkey=ssh_data["id_key"],
@@ -131,7 +140,7 @@ class GABDSSHTunnel:
             else:
               ssh_data["pwd"] = getpass(prompt="Password de l'usuari {} a {}: ".format(ssh_data["user"], ssh_data["ssh"]))
 
-            GABDSSHTunnel._server = SSHTunnelForwarder(
+            GABDSSHTunnel._server = sshTunnel(
                 (ssh_data["ssh"], int(ssh_data['port'])),
                 ssh_username=ssh_data["user"],
                 ssh_password=ssh_data["pwd"],
