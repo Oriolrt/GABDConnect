@@ -176,13 +176,13 @@ class GABDSSHTunnel:
         --------
         None
         """
-        if GABDSSHTunnel._server is not None:
-            if GABDSSHTunnel._num_connections > 0:
-                GABDSSHTunnel._num_connections -= 1
-            if GABDSSHTunnel._num_connections == 0:
-              GABDSSHTunnel._server.stop()
-              GABDSSHTunnel._server = None
-            print(f"Connexió SSH a {self._hostname} tancada.")
+        if GABDSSHTunnel._server and GABDSSHTunnel._num_connections > 0:
+          GABDSSHTunnel._num_connections -= 1
+          if GABDSSHTunnel._num_connections == 0:
+            GABDSSHTunnel._server.stop()
+            GABDSSHTunnel._server = None
+
+        print(f"Connexió SSH a {self._hostname} tancada.")
 
 class AbsConnection(ABC,  GABDSSHTunnel):
   """
