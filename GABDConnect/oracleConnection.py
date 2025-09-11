@@ -71,9 +71,16 @@ class oracleConnection(AbsConnection):
     try:
       self._cursor = self.conn.cursor()
       self._cursor.callproc("dbms_output.enable")
-      return self._cursor
+
     except DatabaseError:
       logging.warning('Database connection already closed')
+      self._cursor = None
+    except AttributeError as e:
+      print("Error: la connexió és None, no puc obrir cursor.")
+      print("Detall:", e)
+      self._cursor = None
+    finally:
+      return self._cursor
 
 
   def open(self) -> None:
@@ -90,7 +97,7 @@ class oracleConnection(AbsConnection):
       self._cursor = self.conn.cursor()
       self.isStarted = True
     except DatabaseError as e:
-      self.closeTunnel()
+      #self.closeTunnel()
       self.isStarted = False
       logging.error(f"Error connecting to the database with dsn: {self._dsn}")
       logging.error(f"Error: {e}")
@@ -110,6 +117,9 @@ class oracleConnection(AbsConnection):
       self.isStarted = False
     except DatabaseError:
       logging.warning('Database connection already closed')
+    except AttributeError as e:
+      print("Error: la connexió és None, no puc obrir cursor.")
+      print("Detall:", e)
 
 
   def commit(self) -> None:
@@ -133,13 +143,16 @@ class oracleConnection(AbsConnection):
     '''
     cur = self._cursor
 
-    res = cur.execute("""SELECT sys_context('USERENV','SESSION_USER')  as "CURRENT USER" ,
+    try:
+      res = cur.execute("""SELECT sys_context('USERENV','SESSION_USER')  as "CURRENT USER" ,
                       sys_context('USERENV', 'CURRENT_SCHEMA') as "CURRENT SCHEMA"
                       FROM dual""").fetchone()
 
-    print("Current user: {}, Current schema: {}".format(res[0], res[1]))
-
-    return True
+      print("Current user: {}, Current schema: {}".format(res[0], res[1]))
+      return True
+    except:
+      logging.error("Database is not open. Check the connection parameters and its status.")
+      return False
 
   def startSession(self) -> bool:
     '''
