@@ -71,6 +71,9 @@ class sshTunnel:
                                     self.chan.send(data)
                             except (OSError, socket.error):
                                 break
+                            except:
+                                pass
+
 
                         if self.chan in r:
                             try:

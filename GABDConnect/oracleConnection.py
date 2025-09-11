@@ -32,7 +32,7 @@ class oracleConnection(AbsConnection):
       Data Source Name per a la connexió a la base de dades.
   '''
 
-  __slots__ = ['_cursor','_serviceName','_dsn']
+  __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
 
   def __init__(self, **params):
     '''
@@ -50,9 +50,13 @@ class oracleConnection(AbsConnection):
 
 
     AbsConnection.__init__(self,**params)
-
     self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
 
+    #mode = params.pop('mode', None)
+
+    mode = SYSDBA if params.pop('mode', '').strip().lower() in ['sysdba', 'dba'] else None
+
+    self._con_params = {'mode': mode} if mode is not None else dict()
 
 
   def cursor(self) -> DB_TYPE_CURSOR:
@@ -82,7 +86,7 @@ class oracleConnection(AbsConnection):
     AbsConnection.open(self)
 
     try:
-      self.conn = connect(self._dsn)
+      self.conn = connect(self._dsn,**self._con_params)
       self._cursor = self.conn.cursor()
       self.isStarted = True
     except DatabaseError as e:
