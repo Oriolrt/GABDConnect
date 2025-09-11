@@ -63,18 +63,33 @@ class sshTunnel:
                     while True:
                         r, _, _ = select.select([self.sock, self.chan], [], [])
                         if self.sock in r:
-                            data = self.sock.recv(1024)
-                            if not data:
+                            try:
+                                data = self.sock.recv(1024)
+                                if not data:
+                                    break
+                                if not self.chan.closed:
+                                    self.chan.send(data)
+                            except (OSError, socket.error):
                                 break
-                            self.chan.send(data)
+
                         if self.chan in r:
-                            data = self.chan.recv(1024)
-                            if not data:
+                            try:
+                                data = self.chan.recv(1024)
+                                if not data:
+                                    break
+                                if self.sock:
+                                    self.sock.send(data)
+                            except (OSError, socket.error):
                                 break
-                            self.sock.send(data)
                 finally:
-                    self.chan.close()
-                    self.sock.close()
+                    try:
+                        self.chan.close()
+                    except Exception:
+                        pass
+                    try:
+                        self.sock.close()
+                    except Exception:
+                        pass
 
         def accept(sock):
             while self._running:
