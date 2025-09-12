@@ -62,15 +62,26 @@ class GABDSSHTunnel:
             Informació d'autenticació SSH.
         '''
         self._hostname = hostname
-        self._port = port if port is not None else 22
-        self._local_port = int(kwargs.pop('local_port',self._port))
+        if port is not None and (not isinstance(port,int) or port<1 or port>65535):
+          raise ValueError(f"Port '{port}' no vàlid. Ha de ser un enter entre 1 i 65535")
+        elif port is None:
+          raise ValueError("Port no pot ser None")
+
+        self._port = port
+
         self._ssh_data = ssh_data
         if 'multiple_tunnels' in kwargs:
-          self._mt = kwargs['multiple_tunnels'].copy()
+          self._mt = a = _format_multiple_tunnels(kwargs['multiple_tunnels'].copy())
+          try:
+            self._local_port = int(kwargs.pop('local_port',{ v[0]:k for k,v in a.items() }[self.hostname]))
+          except KeyError:
+            raise KeyError(f"No s'ha definit un port local per redireccionar {self.hostname}:{self._port}. S'agafarà {self._port} per defecte.")
+            self._local_port = self._port
+
           self._mt[self._local_port] = (self._hostname, self._port)
-          self._mt = _format_multiple_tunnels(self._mt)
         else:
           self._mt = None
+          self._local_port = int(kwargs.pop('local_port',self._port))
 
 
     @property
