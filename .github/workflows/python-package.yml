@@ -4,14 +4,19 @@
 name: Python package
 
 on:
-  push:
-    branches: [ "master" ]
   pull_request:
-    branches: [ "master" ]
+    branches:
+      - master
+    paths-ignore:
+      - '**.md'
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   build:
-
+    if: github.base_ref == 'master' && github.head_ref == 'development'
     runs-on: ubuntu-latest
     environment: GABDConnect
     
