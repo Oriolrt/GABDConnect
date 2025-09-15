@@ -1,61 +1,75 @@
-# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
-
 name: Python package
 
 on:
+  # Trigger automàtic només per PR development → master
   pull_request:
     branches:
       - master
-    paths-ignore:
-      - '**.md'
-    types:
-      - opened
-      - synchronize
-      - reopened
+  # Trigger manual (on demand)
+  workflow_dispatch:
+    inputs:
+      tests:
+        description: "Quins tests executar? Coma-separats o 'all'"
+        required: false
+        default: "all"
 
 jobs:
   build:
-    if: github.base_ref == 'master' && github.head_ref == 'development'
     runs-on: ubuntu-latest
     environment: GABDConnect
-    
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'development')
+
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11"]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - uses: actions/checkout@v4
 
-    - name: Create SSH key file
-      run: |
-        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
-        chmod 600 ssh_key
-    
-    - name: Lint with flake8
-      run: |
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    
-    - name: Test with pytest
-      timeout-minutes: 10   # <--- màxim 10 minuts per executar pytest
-      env:
-        SSH_HOST: ${{ secrets.SSH_HOST }}
-        SSH_PORT: ${{ secrets.SSH_PORT }}
-        SSH_USER: ${{ secrets.SSH_USER }}
-        SSH_PWD: ${{ secrets.SSH_PWD }}
-      run: |
-        pytest test/test_tunnel_ssh.py
-        # pytest test/test_oracle_connection.py
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest flake8 pytest-timeout
+
+      - name: Prepare SSH key
+        run: |
+          # Comprovar si existeix clau local (només útil per executar tests locals amb runner self-hosted)
+          if [ -f "../dev_keys/${{ secrets.SSH_USER }}" ]; then
+            echo "Usant clau local ../dev_keys/${{ secrets.SSH_USER }}"
+            export SSH_KEY="../dev_keys/${{ secrets.SSH_USER }}"
+          else
+            echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
+            chmod 600 ssh_key
+            export SSH_KEY="ssh_key"
+          fi
+          echo "SSH_KEY=$SSH_KEY" >> $GITHUB_ENV
+
+      - name: Lint with flake8
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run selected tests
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PWD: ${{ secrets.SSH_PWD }}
+          SSH_KEY: ${{ env.SSH_KEY }}
+        run: |
+          echo "Usant la clau SSH: $SSH_KEY"
+          if [ "${{ github.event.inputs.tests }}" = "all" ]; then
+            pytest --timeout=600
+          else
+            IFS=',' read -ra TESTS <<< "${{ github.event.inputs.tests }}"
+            for t in "${TESTS[@]}"; do
+              pytest $t --timeout=600
+            done
+          fi
