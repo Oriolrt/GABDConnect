@@ -10,6 +10,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
     ssh_host = os.environ.get("SSH_HOST")
     ssh_user = os.environ.get("SSH_USER")
     ssh_pwd = os.environ.get("SSH_PWD")
+    ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
     ssh_port = int(os.environ.get("SSH_PORT", 22))
 
     if not all([ssh_host, ssh_user, ssh_pwd]):

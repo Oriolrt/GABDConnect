@@ -1,11 +1,24 @@
 import unittest
 from GABDConnect.mongoConnection import mongoConnection
+import os
 
 
 class MongoConnectTestCase(unittest.TestCase):
   def setUp(self):
+    ssh_host = os.environ.get("SSH_HOST")
+    ssh_user = os.environ.get("SSH_USER")
+    ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
+    ssh_port = int(os.environ.get("SSH_PORT", 8192))
 
-    self.ssh_server = {'ssh': "dcccluster.uab.cat" , 'user': "student", 'id_key': "dev_keys/id_student", 'port': 8192}
+    if not all([ssh_host, ssh_user]) or not os.path.exists(ssh_key_path):
+      self.skipTest("SSH credentials not provided in environment variables")
+
+    self.ssh_server = {
+      'ssh': ssh_host,
+      'user': ssh_user,
+      'id_key': ssh_key_path,
+      'port': ssh_port,
+    }
     self.hostname = "localhost"
     self.port = 27017
     self.db = "test"
