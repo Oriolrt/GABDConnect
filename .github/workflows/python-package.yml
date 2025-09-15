@@ -52,4 +52,5 @@ jobs:
         SSH_USER: ${{ secrets.SSH_USER }}
         SSH_PWD: ${{ secrets.SSH_PWD }}
       run: |
-        pytest
+        pytest test/test_tunnel_ssh.py
+        pytest test/test_oracle_connection.py
