@@ -110,6 +110,69 @@ class sshTunnel:
         threading.Thread(target=accept, args=(sock,), daemon=True).start()
         self._sockets.append(sock)
 
+
+    def add_forward(self, remote, local=("localhost", 0)):
+      """
+      Afegeix un nou forward al túnel SSH existent.
+      remote: (remote_host, remote_port)
+      local: (local_host, local_port)
+      """
+      remote_host, remote_port = remote
+      local_host, local_port = local
+
+      # Verificar si ja tenim aquest mapping
+      if (remote_host, remote_port) in self.remote_bind_addresses and (
+      local_host, local_port) in self.local_bind_addresses:
+        print(f"[WARN] Forward {local_host}:{local_port} -> {remote_host}:{remote_port} ja existeix.")
+        return
+
+      try:
+        # Crear el forward
+        self.forward_tunnel(local_port, remote_host, remote_port)
+
+        # Guardar el mapping
+        self.remote_bind_addresses.append((remote_host, remote_port))
+        self.local_bind_addresses.append((local_host, local_port))
+
+        print(f"[INFO] Afegit forward {local_host}:{local_port} -> {remote_host}:{remote_port}")
+      except Exception as e:
+        print(f"[ERROR] No s'ha pogut afegir el forward {local_host}:{local_port} -> {remote_host}:{remote_port}: {e}")
+
+    def remove_forward(self, local_port):
+      """
+      Elimina el forward associat a un port local concret.
+      """
+      sock_to_remove = None
+      idx_to_remove = None
+
+      # Buscar quin forward correspon al local_port
+      for idx, (local_host, lp) in enumerate(self.local_bind_addresses):
+        if lp == local_port:
+          idx_to_remove = idx
+          break
+
+      if idx_to_remove is None:
+        print(f"[WARN] No s'ha trobat cap forward per al port local {local_port}")
+        return
+
+      # Tancar el socket associat
+      try:
+        sock_to_remove = self._sockets[idx_to_remove]
+        sock_to_remove.close()
+        print(f"[INFO] Forward al port local {local_port} eliminat correctament.")
+      except Exception as e:
+        print(f"[ERROR] No s'ha pogut eliminar el forward al port {local_port}: {e}")
+
+      # Eliminar de les llistes
+      try:
+        self._sockets.pop(idx_to_remove)
+        self.local_bind_addresses.pop(idx_to_remove)
+        self.remote_bind_addresses.pop(idx_to_remove)
+      except Exception:
+        pass
+
+
+
     def start(self):
         self.client = paramiko.SSHClient()
         self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())

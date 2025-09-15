@@ -132,54 +132,59 @@ class OracleConnectTestCase(unittest.TestCase):
     self.user= 'sys'
     self.pwd= 'oracle'
     self.mode='sysDBA'
-    self.hostname = "oracle-2.grup00.gabd"
-    self.multiple_tunnels = {1521: "oracle-1.grup00.gabd:1521", 1522: ("oracle-2.grup00.gabd", 1521)}
+    self.ssh_server['port'] = 8192
+    self.hostname = None
+    self.multiple_tunnels = None
 
     group_tunnels = {}
     group_connections_info = {}
-    line = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}"
+
+    file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
+    file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
     local_port_counter = 1521
 
-    # Split the line by spaces or tabs
-    parts = line.strip().split()
-    if len(parts) == 3:
-      group_name, PORT, ID_KEY = parts
-      # Create the tunnels dictionary for the current group
-      tunnels = {int(local_port_counter): f"oracle-1.{group_name}.gabd:1521",
-                 int(local_port_counter + 1): (f"oracle-2.{group_name}.gabd", 1521)}
-      # Store the tunnels dictionary in the group_tunnels dictionary
-      group_tunnels[group_name] = tunnels
-      #
+    for line in file.strip().split('\n'):
 
-      # Create connection information for the two Oracle servers
-      conn_info_oracle1 = {
-        'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
-        'passwd': self.pwd,  # Assuming 'oracle_pwd' is defined in R9NyUeLD7ieV
-        'hostname': f"oracle-1.{group_name}.gabd",
-        'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY, 'port': int(PORT)},
-        # Updated ssh_data,
-        'serviceName': self.serviceName,  # Assuming 'serviceName' is defined in R9NyUeLD7ieV
-        'mode': self.mode,  # Assuming 'mode' is defined in R9NyUeLD7ieV
-        'multiple_tunnels': self.multiple_tunnels.copy(),
-        # 'local_port': local_port_counter # Add local_port key
-      }
-      local_port_counter += 1  # Increment local port counter
+      # Split the line by spaces or tabs
+      parts = line.strip().split()
+      if len(parts) == 3:
+        group_name, PORT, ID_KEY = parts
+        # Create the tunnels dictionary for the current group
+        tunnels = {int(local_port_counter): f"oracle-1.{group_name}.gabd:1521",
+                   int(local_port_counter + 1): (f"oracle-2.{group_name}.gabd", 1521)}
+        # Store the tunnels dictionary in the group_tunnels dictionary
+        group_tunnels[group_name] = tunnels
+        #
 
-      conn_info_oracle2 = {
-        'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
-        'passwd': self.pwd,  # Assuming 'oracle_pwd' is defined in R9NyUeLD7ieV
-        'hostname': f"oracle-2.{group_name}.gabd",
-        'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY, 'port': int(PORT)},
-        # Updated ssh_data
-        'serviceName': self.serviceName,  # Assuming 'serviceName' is defined in R9NyUeLD7ieV
-        'mode': self.mode,  # Assuming 'mode' is defined in R9NyUeLD7ieV
-        'multiple_tunnels': self.multiple_tunnels.copy(),
-        # 'local_port': local_port_counter # Add local_port key
-      }
-      local_port_counter += 1  # Increment local port counter
+        # Create connection information for the two Oracle servers
+        conn_info_oracle1 = {
+          'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
+          'passwd': self.pwd,  # Assuming 'oracle_pwd' is defined in R9NyUeLD7ieV
+          'hostname': f"oracle-1.{group_name}.gabd",
+          'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY, 'port': int(PORT)},
+          # Updated ssh_data,
+          'serviceName': self.serviceName,  # Assuming 'serviceName' is defined in R9NyUeLD7ieV
+          'mode': self.mode,  # Assuming 'mode' is defined in R9NyUeLD7ieV
+          'multiple_tunnels': tunnels.copy()
+          # 'local_port': local_port_counter # Add local_port key
+        }
+        local_port_counter += 1  # Increment local port counter
 
-      # Store the connection information in the group_connections_info dictionary
-      group_connections_info[group_name] = [conn_info_oracle1, conn_info_oracle2]
+        conn_info_oracle2 = {
+          'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
+          'passwd': self.pwd,  # Assuming 'oracle_pwd' is defined in R9NyUeLD7ieV
+          'hostname': f"oracle-2.{group_name}.gabd",
+          'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY, 'port': int(PORT)},
+          # Updated ssh_data
+          'serviceName': self.serviceName,  # Assuming 'serviceName' is defined in R9NyUeLD7ieV
+          'mode': self.mode,  # Assuming 'mode' is defined in R9NyUeLD7ieV
+          'multiple_tunnels': tunnels.copy()
+          # 'local_port': local_port_counter # Add local_port key
+        }
+        local_port_counter += 2  # Increment local port counter
+
+        # Store the connection information in the group_connections_info dictionary
+        group_connections_info[group_name] = [conn_info_oracle1, conn_info_oracle2]
 
     # Iterate through the group_connections_info dictionary and open connections
     all_dbs = []
@@ -197,12 +202,6 @@ class OracleConnectTestCase(unittest.TestCase):
         # Append the connection object to the all_dbs list
         all_dbs.append(d)
 
-    self.client = orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
-                       passwd=self.pwd, serviceName=self.serviceName,multiple_tunnels=self.multiple_tunnels,mode=self.mode)
-    self.client.open()
-
-    self.assertTrue(self.client.isStarted,
-                         f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel")
 
     for d in all_dbs:
       try:
