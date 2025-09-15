@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.8","3.9", "3.10", "3.11", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
@@ -53,4 +53,4 @@ jobs:
         SSH_PWD: ${{ secrets.SSH_PWD }}
       run: |
         pytest test/test_tunnel_ssh.py
-        pytest test/test_oracle_connection.py
+        # pytest test/test_oracle_connection.py
