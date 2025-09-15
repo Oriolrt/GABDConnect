@@ -44,7 +44,7 @@ class GABDSSHTunnel:
     """
     Classe per gestionar túnels SSH per a connexions a bases de dades.
     """
-    _server = None
+    _servers = {}  # clau = (ssh, port, user), valor = sshTunnel
     _num_connections = 0
 
     __slots__ = ['_hostname', '_port', '_ssh_data','_local_port','_mt']
@@ -132,68 +132,96 @@ class GABDSSHTunnel:
         remote_binds = [(self._hostname, int(self._port))]
         local_binds = [("", int(self._local_port))]
 
+      if self._ssh_data is None:
+        raise ValueError("Falten dades SSH")
 
-      if self._ssh_data is not None:
-        ssh_data = self._ssh_data
-        if ssh_data is not None:
-          if "id_key" in ssh_data:
-            GABDSSHTunnel._server = sshTunnel(
-                (ssh_data["ssh"], int(ssh_data['port'])),
-                ssh_username=ssh_data["user"],
-                ssh_pkey=ssh_data["id_key"],
-                remote_bind_addresses=remote_binds,
-                local_bind_addresses=local_binds
+      ssh_data = self._ssh_data
+      key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
+
+      # Comprovar si ja existeix el túnel per aquest host
+      if key not in GABDSSHTunnel._servers:
+        # Autenticació
+        if "id_key" in ssh_data:
+          tunnel = sshTunnel(
+            (ssh_data["ssh"], int(ssh_data['port'])),
+            ssh_username=ssh_data["user"],
+            ssh_pkey=ssh_data["id_key"],
+            remote_bind_addresses=[],
+            local_bind_addresses=[]
+          )
+        else:
+          if "pwd" not in ssh_data or not ssh_data["pwd"]:
+            ssh_data["pwd"] = getpass(
+              prompt=f"Password de l'usuari {ssh_data['user']} a {ssh_data['ssh']}: "
             )
-          else:
-            if "pwd" in ssh_data:
-              if ssh_data["pwd"] == "" or ssh_data["pwd"] is None:
-                ssh_data["pwd"] = getpass(prompt="Password de l'usuari {} a {}: ".format(ssh_data["user"], ssh_data["ssh"]))
-            else:
-              ssh_data["pwd"] = getpass(prompt="Password de l'usuari {} a {}: ".format(ssh_data["user"], ssh_data["ssh"]))
+          tunnel = sshTunnel(
+            (ssh_data["ssh"], int(ssh_data['port'])),
+            ssh_username=ssh_data["user"],
+            ssh_password=ssh_data["pwd"],
+            remote_bind_addresses=[],
+            local_bind_addresses=[]
+          )
 
-            GABDSSHTunnel._server = sshTunnel(
-                (ssh_data["ssh"], int(ssh_data['port'])),
-                ssh_username=ssh_data["user"],
-                ssh_password=ssh_data["pwd"],
-                remote_bind_addresses=remote_binds,
-                local_bind_addresses=local_binds
-            )
+        # Crear connexió SSH
+        try:
+          tunnel.start()
+          GABDSSHTunnel._servers[key] = tunnel
+          GABDSSHTunnel._num_connections += 1
+          print(f"[INFO] Connexió SSH oberta a {ssh_data['ssh']}:{ssh_data['port']} com {ssh_data['user']}")
+        except Exception as e:
+          print(f"[ERROR] No s'ha pogut obrir el túnel: {e}")
+          return
 
-          if self._mt is not None:
-            forwards = " -L ".join([f"{local_port}:{remote_host}:{remote_port}" for local_port, (remote_host, remote_port) in self._mt.items()])
-          else:
-            forwards = f"  {self._local_port}:{self._hostname}:{self._port}"
+      # Afegir forwards (tant si és túnel nou com si ja existia)
+      tunnel = GABDSSHTunnel._servers[key]
+      for r, l in zip(remote_binds, local_binds):
+        tunnel.add_forward(r, l)
 
+      # Missatge d'info
+      if self._mt is not None:
+        forwards = " -L ".join([f"{local_port}:{remote_host}:{remote_port}"
+                                for local_port, (remote_host, remote_port) in self._mt.items()])
+      else:
+        forwards = f"{self._local_port}:{self._hostname}:{self._port}"
 
-          if GABDSSHTunnel._num_connections == 0:
-            try:
-              GABDSSHTunnel._server.start()
-              GABDSSHTunnel._num_connections += 1
-              message = f"Connexió SSH a {self._hostname} oberta. S'ha obert un túnel a través de {ssh_data['ssh']} " \
-                        f"al port {self._port}. La instrucció equivalent per fer-ho manualment seria: \n" \
-                        f"ssh -L {forwards} {ssh_data['user']}@{ssh_data['ssh']} -p {ssh_data['port']}"
-              print(message)
-
-            except Exception as e:
-              print(f"Error al obrir el túnel SSH: {e}")
-
-
+      print(f"ssh -L {forwards} {ssh_data['user']}@{ssh_data['ssh']} -p {ssh_data['port']}")
 
     def closeTunnel(self):
-        """
-        Tanca el túnel SSH obert.
+      """
+      Tanca el forward associat a aquesta connexió Oracle.
+      Si és l'últim forward d'un túnel SSH, tanca també el túnel.
+      """
+      if self._ssh_data is None:
+        print("[WARN] No hi ha dades SSH per tancar túnel")
+        return
 
-        Retorna:
-        --------
-        None
-        """
-        if GABDSSHTunnel._server and GABDSSHTunnel._num_connections > 0:
-          GABDSSHTunnel._num_connections -= 1
-          if GABDSSHTunnel._num_connections == 0:
-            GABDSSHTunnel._server.stop()
-            GABDSSHTunnel._server = None
+      ssh_data = self._ssh_data
+      key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
 
-        print(f"Connexió SSH a {self._hostname} tancada.")
+      tunnel = GABDSSHTunnel._servers.get(key)
+      if not tunnel:
+        print("[WARN] No s'ha trobat cap túnel actiu per tancar")
+        return
+
+      # Determinar quin port local s'estava utilitzant
+      if self._mt is not None:
+        local_ports = list(self._mt.keys())
+      else:
+        local_ports = [int(self._local_port)]
+
+      # Eliminar forwards d'aquest objecte
+      for lp in local_ports:
+        tunnel.remove_forward(lp)
+
+      # Si no queden forwards, tanquem completament el túnel
+      if not tunnel.local_bind_addresses:
+        tunnel.stop()
+        GABDSSHTunnel._servers.pop(key, None)
+        GABDSSHTunnel._num_connections -= 1
+        print(f"[INFO] Túnel SSH {ssh_data['ssh']}:{ssh_data['port']} tancat (sense forwards restants).")
+      else:
+        print(f"[INFO] Forwards {local_ports} eliminats, túnel SSH segueix actiu amb altres forwards.")
+
 
 class AbsConnection(ABC,  GABDSSHTunnel):
   """
