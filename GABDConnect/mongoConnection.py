@@ -94,17 +94,36 @@ class mongoConnection(AbsConnection):
 
     return self.conn
 
+  from pymongo.errors import PyMongoError
+
   def close(self):
     """
-    Tanca la connexió a la base de dades MongoDB.
+    Tanca la connexió a la base de dades MongoDB i el túnel SSH associat.
 
     Retorna:
     --------
     None
     """
-    self.conn = self.conn.close()
-    self.closeTunnel()
-    self.isStarted = False
+    try:
+      if self.conn:
+        self.conn.close()
+        print("[INFO] Connexió MongoDB tancada correctament.")
+      else:
+        print("[WARN] No hi havia connexió MongoDB activa.")
+
+      # Tancar el forward/túnel associat
+      self.closeTunnel()
+      self.isStarted = False
+
+    except errors.PyMongoError as e:
+      print(f"[ERROR] Error en tancar la connexió MongoDB: {e}")
+    except AttributeError:
+      print("[WARN] L'objecte MongoClient no existeix (self.conn és None).")
+
+    finally:
+      self.conn = None
+      self.bd = None
+      self.isStarted = False
 
   def startSession(self):
     """

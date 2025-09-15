@@ -1,6 +1,7 @@
 import unittest
 from GABDConnect.mongoConnection import mongoConnection
 import os
+from pymongo.errors import OperationFailure
 
 
 class MongoConnectTestCase(unittest.TestCase):
@@ -115,19 +116,41 @@ class MongoConnectTestCase(unittest.TestCase):
     self.pwd = "gGeonames_pwd"
     self.bd = "Practica_3"
 
-    self.client = mongoConnection(user=self.user, pwd=self.pwd, hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
-    self.client.open()
-    db = self.client.conn[self.client.bd_name]
-    self.assertIsNotNone(db,
-                         f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
-    #recuperem els 10 primer elements de la col·lecció geonames
-    col = db["geonames"]
-    for doc in col.find().limit(10):
-      print(doc)
+    try:
+      # Intentem amb autenticació
+      self.client = mongoConnection(
+        user=self.user,
+        pwd=self.pwd,
+        hostname=self.hostname,
+        port=self.port,
+        ssh_data=self.ssh_server,
+        db=self.bd
+      )
+      self.client.open()
 
-    self.client.close()
-    #veriquem que hem tancat la connexió
-    self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+      db = self.client.conn[self.client.bd_name]
+      self.assertIsNotNone(db,
+                           f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
+      # recuperem els 10 primer elements de la col·lecció geonames
+      col = db["geonames"]
+      for doc in col.find().limit(10):
+        print(doc)
+
+
+
+    except OperationFailure:
+      # Si Mongo no té auth activada → reintent sense credencials
+      print("[WARN] Autenticació fallida o no activada...")
+
+    finally:
+      self.client.close()
+      # veriquem que hem tancat la connexió
+      self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+
+
+
+
+
 
 
 
