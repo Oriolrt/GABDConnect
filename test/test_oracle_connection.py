@@ -181,7 +181,7 @@ class OracleConnectTestCase(unittest.TestCase):
           'multiple_tunnels': tunnels.copy()
           # 'local_port': local_port_counter # Add local_port key
         }
-        local_port_counter += 2  # Increment local port counter
+        local_port_counter += 1  # Increment local port counter
 
         # Store the connection information in the group_connections_info dictionary
         group_connections_info[group_name] = [conn_info_oracle1, conn_info_oracle2]
