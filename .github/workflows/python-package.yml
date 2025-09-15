@@ -58,4 +58,5 @@ jobs:
         SSH_PWD: ${{ secrets.SSH_PWD }}
       run: |
         pytest test/test_tunnel_ssh.py
-        # pytest test/test_oracle_connection.py
+        pytest test/test_oracle_connection.py
+        pytest test/test_mongo_connection.py
