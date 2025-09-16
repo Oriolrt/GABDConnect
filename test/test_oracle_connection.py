@@ -6,7 +6,14 @@ import os
 class OracleConnectTestCase(unittest.TestCase):
     def setUp(self):
         # Comprovar fitxer local de credencials o usar el fitxer creat pel workflow
-        ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
+        ssh_key_local = "../dev_keys/id_student"
+        ssh_key_home = os.path.expanduser("~/.ssh/id_student")
+
+        ssh_key_path = (
+            ssh_key_local if os.path.exists(ssh_key_local)
+            else ssh_key_home if os.path.exists(ssh_key_home)
+            else "ssh_key"
+        )
 
         # Llegir credencials del workflow si no hi ha fitxer local
         ssh_host = os.environ.get("SSH_HOST", "dcccluster.uab.cat")
