@@ -47,7 +47,7 @@ jobs:
 
       - name: Test SSH connection
         run: |
-          ssh -i $SSH_KEY -p ${{ secrets.SSH_PORT }} \
+          ssh -i "$SSH_KEY" -p ${{ secrets.SSH_PORT }} \
             -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami"
 
