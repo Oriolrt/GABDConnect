@@ -10,9 +10,8 @@ copyrigth: 2018, Oriol Ramos Terrades
 Aquest script forma part del material didàctic de l'assignatura de Gestió i Administració de Bases de Dades (GABD) de la Universitat Autònoma de Barcelona. La classe `oracleConnection` proporciona una implementació específica per a la gestió de connexions a bases de dades Oracle, incloent la configuració i manteniment de les connexions. Aquesta eina és essencial per a l'administració segura i eficient de bases de dades Oracle en entorns distribuïts.
 """
 
-
-from getpass import getpass
 import logging
+
 from oracledb import *
 
 from .AbsConnection import AbsConnection

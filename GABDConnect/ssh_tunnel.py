@@ -4,15 +4,13 @@ Created on Jun 12, 2018
 
 """
 
-import paramiko
-import threading
-import socket
-import select
-import time
 import gc
+import select
+import socket
+import threading
+import time
 
-
-
+import paramiko
 
 
 class sshTunnel:

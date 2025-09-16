@@ -10,9 +10,9 @@ copyrigth: 2018, Oriol Ramos Terrades
 Aquest script forma part del material didàctic de l'assignatura de Gestió i Administració de Bases de Dades (GABD) de la Universitat Autònoma de Barcelona. Les classes `AbsConnection` i `GABDSSHTunnel` proporcionen una base per a la gestió de connexions a bases de dades i la configuració de túnels SSH, respectivament. Aquestes eines són essencials per a l'administració segura i eficient de bases de dades en entorns distribuïts.
 """
 
+import warnings
 from abc import ABC, abstractmethod
 
-import warnings
 warnings.filterwarnings(
     "ignore",
     category=DeprecationWarning,

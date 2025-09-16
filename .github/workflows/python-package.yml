@@ -70,11 +70,12 @@ jobs:
           SSH_KEY: ${{ env.SSH_KEY }}
         run: |
           echo "Usant la clau SSH: $SSH_KEY"
-          if [ "${{ github.event.inputs.tests }}" = "all" ]; then
+          TESTS="${{ github.event.inputs.tests || 'all' }}"
+          if [ "$TESTS" = "all" ]; then
             pytest --timeout=600
           else
-            IFS=',' read -ra TESTS <<< "${{ github.event.inputs.tests }}"
-            for t in "${TESTS[@]}"; do
+            IFS=',' read -ra TLIST <<< "$TESTS"
+            for t in "${TLIST[@]}"; do
               pytest $t --timeout=600
             done
           fi

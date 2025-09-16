@@ -94,8 +94,6 @@ class mongoConnection(AbsConnection):
 
     return self.conn
 
-  from pymongo.errors import PyMongoError
-
   def close(self):
     """
     Tanca la connexió a la base de dades MongoDB i el túnel SSH associat.
