@@ -37,7 +37,7 @@ jobs:
         run: |
           if [ -f "$HOME/.ssh/id_student" ]; then
             echo "Trobada clau local a ~/.ssh/id_student, l'usaré"
-            export SSH_KEY="$HOME/.ssh/id_student "
+            export SSH_KEY="$HOME/.ssh/id_student"
           else
             echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
             chmod 600 ssh_key
