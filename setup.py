@@ -8,7 +8,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = '3.1.0'
+VERSION = '3.1.1'
 DESCRIPTION = 'Classes to connect to Oracle and MongoDB server directly or through ssh tunneling.'
 
 # Setting up
