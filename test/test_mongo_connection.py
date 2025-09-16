@@ -8,8 +8,15 @@ class MongoConnectTestCase(unittest.TestCase):
     def setUp(self):
         ssh_host = os.environ.get("SSH_HOST")
         ssh_user = os.environ.get("SSH_USER")
-        ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
         ssh_port = int(os.environ.get("SSH_PORT", 8192))
+        ssh_key_local = "../dev_keys/id_student"
+        ssh_key_home = os.path.expanduser("~/.ssh/id_student")
+
+        ssh_key_path = (
+            ssh_key_local if os.path.exists(ssh_key_local)
+            else ssh_key_home if os.path.exists(ssh_key_home)
+            else "ssh_key"
+        )
 
         if not all([ssh_host, ssh_user]) or not os.path.exists(ssh_key_path):
             self.skipTest("SSH credentials not provided in environment variables")
