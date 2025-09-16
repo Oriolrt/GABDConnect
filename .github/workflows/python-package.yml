@@ -1,11 +1,9 @@
 name: Python package
 
 on:
-  # Trigger automàtic només per PR development → master
   pull_request:
     branches:
       - master
-  # Trigger manual (on demand)
   workflow_dispatch:
     inputs:
       tests:
@@ -21,16 +19,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install pyenv
-        run: |
-          curl https://pyenv.run | bash
-          export PATH="$HOME/.pyenv/bin:$PATH"
-          eval "$(pyenv init -)"
-          eval "$(pyenv virtualenv-init -)"
-          echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> $GITHUB_ENV
-          echo 'eval "$(pyenv init -)"' >> $GITHUB_ENV
-          echo 'eval "$(pyenv virtualenv-init -)"' >> $GITHUB_ENV
 
       - name: Prepare SSH key
         run: |
@@ -49,7 +37,7 @@ jobs:
           ssh -i ssh_key -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no \
           ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami"
 
-      - name: Run builds sequentially with pyenv
+      - name: Run builds sequentially on multiple Python versions
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
@@ -57,20 +45,21 @@ jobs:
           SSH_PWD: ${{ secrets.SSH_PWD }}
           SSH_KEY: ${{ env.SSH_KEY }}
         run: |
-          export PATH="$HOME/.pyenv/bin:$PATH"
-          eval "$(pyenv init -)"
-          eval "$(pyenv virtualenv-init -)"
-
           TESTS="${{ github.event.inputs.tests || 'all' }}"
 
-          for version in 3.8.18 3.9.18 3.10.13 3.11.9 3.12.3; do
+          # Definim les versions de Python
+          PY_VERSIONS=(3.8 3.9 3.10 3.11 3.12)
+
+          for version in "${PY_VERSIONS[@]}"; do
             echo "=============================="
             echo " Running tests on Python $version "
             echo "=============================="
 
-            pyenv install -s $version
-            pyenv global $version
-
+            # Setup Python via Action
+            echo "::group::Setup Python $version"
+            echo "::endgroup::"
+            # Directament fem setup amb pyenv integrat a GitHub Actions
+            # actions/setup-python només funciona com a 'uses:', per això fem un workaround amb exec
             python -m pip install --upgrade pip
             pip install -r requirements.txt
             pip install pytest flake8 pytest-timeout
