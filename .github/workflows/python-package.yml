@@ -19,28 +19,21 @@ jobs:
     environment: GABDConnect
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'development')
 
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8","3.9","3.10", "3.11", "3.12"]
-
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
+      - name: Install pyenv
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest flake8 pytest-timeout
+          curl https://pyenv.run | bash
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          eval "$(pyenv virtualenv-init -)"
+          echo 'export PATH="$HOME/.pyenv/bin:$PATH"' >> $GITHUB_ENV
+          echo 'eval "$(pyenv init -)"' >> $GITHUB_ENV
+          echo 'eval "$(pyenv virtualenv-init -)"' >> $GITHUB_ENV
 
       - name: Prepare SSH key
         run: |
-          # Comprovar si existeix clau local (només útil per executar tests locals amb runner self-hosted)
           if [ -f "../dev_keys/${{ secrets.SSH_USER }}" ]; then
             echo "Usant clau local ../dev_keys/${{ secrets.SSH_USER }}"
             export SSH_KEY="../dev_keys/${{ secrets.SSH_USER }}"
@@ -55,13 +48,8 @@ jobs:
         run: |
           ssh -i ssh_key -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no \
           ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami"
-          
-      - name: Lint with flake8
-        run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
 
-      - name: Run selected tests
+      - name: Run builds sequentially with pyenv
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
@@ -69,13 +57,35 @@ jobs:
           SSH_PWD: ${{ secrets.SSH_PWD }}
           SSH_KEY: ${{ env.SSH_KEY }}
         run: |
-          echo "Usant la clau SSH: $SSH_KEY"
+          export PATH="$HOME/.pyenv/bin:$PATH"
+          eval "$(pyenv init -)"
+          eval "$(pyenv virtualenv-init -)"
+
           TESTS="${{ github.event.inputs.tests || 'all' }}"
-          if [ "$TESTS" = "all" ]; then
-            pytest --timeout=600
-          else
-            IFS=',' read -ra TLIST <<< "$TESTS"
-            for t in "${TLIST[@]}"; do
-              pytest $t --timeout=600
-            done
-          fi
+
+          for version in 3.8.18 3.9.18 3.10.13 3.11.9 3.12.3; do
+            echo "=============================="
+            echo " Running tests on Python $version "
+            echo "=============================="
+
+            pyenv install -s $version
+            pyenv global $version
+
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+            pip install pytest flake8 pytest-timeout
+
+            # Lint
+            flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+            flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+            # Run tests
+            if [ "$TESTS" = "all" ]; then
+              pytest --timeout=600
+            else
+              IFS=',' read -ra TLIST <<< "$TESTS"
+              for t in "${TLIST[@]}"; do
+                pytest $t --timeout=600
+              done
+            fi
+          done
