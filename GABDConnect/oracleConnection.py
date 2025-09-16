@@ -18,165 +18,165 @@ from .AbsConnection import AbsConnection
 
 
 class oracleConnection(AbsConnection):
-  '''
-  Classe per gestionar la connexió a una base de dades Oracle.
-
-  Atributs:
-  ----------
-  _cursor : oracledb.Cursor
-      Cursor per executar procediments i consultes.
-  _serviceName : str
-      Nom del servei de la base de dades.
-  _dsn : str
-      Data Source Name per a la connexió a la base de dades.
-  '''
-
-  __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
-
-  def __init__(self, **params):
     '''
-    Constructor per inicialitzar la connexió Oracle.
+    Classe per gestionar la connexió a una base de dades Oracle.
 
-    Paràmetres:
-    -----------
-    **params : dict
-        Paràmetres de connexió, incloent `serviceName` i `port`.
-     '''
-
-    self._cursor = None
-    self._serviceName = params.pop('serviceName', 'orcl')
-    params['port'] = params.pop('port', 1521)
-
-
-    AbsConnection.__init__(self,**params)
-    self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
-
-    #mode = params.pop('mode', None)
-
-    mode = SYSDBA if params.pop('mode', '').strip().lower() in ['sysdba', 'dba'] else None
-
-    self._con_params = {'mode': mode} if mode is not None else dict()
-
-
-  def cursor(self) -> DB_TYPE_CURSOR:
+    Atributs:
+    ----------
+    _cursor : oracledb.Cursor
+        Cursor per executar procediments i consultes.
+    _serviceName : str
+        Nom del servei de la base de dades.
+    _dsn : str
+        Data Source Name per a la connexió a la base de dades.
     '''
-    Retorna el cursor de la connexió Oracle.
 
-    Retorna:
-    --------
-    oracledb.Cursor
-        El cursor de la connexió.
-    '''
-    try:
-      self._cursor = self.conn.cursor()
-      self._cursor.callproc("dbms_output.enable")
+    __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
 
-    except DatabaseError:
-      logging.warning('Database connection already closed')
-      self._cursor = None
-    except AttributeError as e:
-      print("Error: la connexió és None, no puc obrir cursor.")
-      print("Detall:", e)
-      self._cursor = None
-    finally:
-      return self._cursor
+    def __init__(self, **params):
+        '''
+        Constructor per inicialitzar la connexió Oracle.
+
+        Paràmetres:
+        -----------
+        **params : dict
+            Paràmetres de connexió, incloent `serviceName` i `port`.
+         '''
+
+        self._cursor = None
+        self._serviceName = params.pop('serviceName', 'orcl')
+        params['port'] = params.pop('port', 1521)
 
 
-  def open(self) -> None:
-    """
-      Connect to a oracle server given the connexion information saved on the cfg member variable.
+        AbsConnection.__init__(self,**params)
+        self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
 
-      :return: None
-    """
+        #mode = params.pop('mode', None)
 
-    AbsConnection.open(self)
+        mode = SYSDBA if params.pop('mode', '').strip().lower() in ['sysdba', 'dba'] else None
 
-    try:
-      self.conn = connect(self._dsn,**self._con_params)
-      self._cursor = self.conn.cursor()
-      self.isStarted = True
-    except DatabaseError as e:
-      #self.closeTunnel()
-      self.isStarted = False
-      logging.error(f"Error connecting to the database with dsn: {self._dsn}")
-      logging.error(f"Error: {e}")
+        self._con_params = {'mode': mode} if mode is not None else dict()
 
 
-  def close(self) -> None:
-    '''
-    Tanca la connexió a la base de dades Oracle.
+    def cursor(self) -> DB_TYPE_CURSOR:
+        '''
+        Retorna el cursor de la connexió Oracle.
 
-    Retorna:
-    --------
-    None
-    '''
-    try:
-      self.conn.close()
-      self.closeTunnel()
-      self.isStarted = False
-    except DatabaseError:
-      logging.warning('Database connection already closed')
-    except AttributeError as e:
-      print("Error: la connexió és None, no puc obrir cursor.")
-      print("Detall:", e)
+        Retorna:
+        --------
+        oracledb.Cursor
+            El cursor de la connexió.
+        '''
+        try:
+            self._cursor = self.conn.cursor()
+            self._cursor.callproc("dbms_output.enable")
+
+        except DatabaseError:
+            logging.warning('Database connection already closed')
+            self._cursor = None
+        except AttributeError as e:
+            print("Error: la connexió és None, no puc obrir cursor.")
+            print("Detall:", e)
+            self._cursor = None
+        finally:
+            return self._cursor
 
 
-  def commit(self) -> None:
-    '''
-    Fa un commit de la transacció actual.
+    def open(self) -> None:
+        """
+          Connect to a oracle server given the connexion information saved on the cfg member variable.
 
-    Retorna:
-    --------
-    None
-    '''
-    self.conn.commit()
+          :return: None
+        """
 
-  def testConnection(self) -> bool:
-    '''
-    Prova la connexió a la base de dades Oracle.
+        AbsConnection.open(self)
 
-    Retorna:
-    --------
-    bool
-        True si la connexió és correcta, False en cas contrari.
-    '''
-    cur = self._cursor
+        try:
+            self.conn = connect(self._dsn,**self._con_params)
+            self._cursor = self.conn.cursor()
+            self.isStarted = True
+        except DatabaseError as e:
+            #self.closeTunnel()
+            self.isStarted = False
+            logging.error(f"Error connecting to the database with dsn: {self._dsn}")
+            logging.error(f"Error: {e}")
 
-    try:
-      res = cur.execute("""SELECT sys_context('USERENV','SESSION_USER')  as "CURRENT USER" ,
+
+    def close(self) -> None:
+        '''
+        Tanca la connexió a la base de dades Oracle.
+
+        Retorna:
+        --------
+        None
+        '''
+        try:
+            self.conn.close()
+            self.closeTunnel()
+            self.isStarted = False
+        except DatabaseError:
+            logging.warning('Database connection already closed')
+        except AttributeError as e:
+            print("Error: la connexió és None, no puc obrir cursor.")
+            print("Detall:", e)
+
+
+    def commit(self) -> None:
+        '''
+        Fa un commit de la transacció actual.
+
+        Retorna:
+        --------
+        None
+        '''
+        self.conn.commit()
+
+    def testConnection(self) -> bool:
+        '''
+        Prova la connexió a la base de dades Oracle.
+
+        Retorna:
+        --------
+        bool
+            True si la connexió és correcta, False en cas contrari.
+        '''
+        cur = self._cursor
+
+        try:
+            res = cur.execute("""SELECT sys_context('USERENV','SESSION_USER')  as "CURRENT USER" ,
                       sys_context('USERENV', 'CURRENT_SCHEMA') as "CURRENT SCHEMA"
                       FROM dual""").fetchone()
 
-      print("Current user: {}, Current schema: {}".format(res[0], res[1]))
-      return True
-    except:
-      logging.error("Database is not open. Check the connection parameters and its status.")
-      return False
+            print("Current user: {}, Current schema: {}".format(res[0], res[1]))
+            return True
+        except:
+            logging.error("Database is not open. Check the connection parameters and its status.")
+            return False
 
-  def startSession(self) -> bool:
-    '''
-    Inicia una sessió amb la base de dades Oracle.
+    def startSession(self) -> bool:
+        '''
+        Inicia una sessió amb la base de dades Oracle.
 
-    Retorna:
-    --------
-    bool
-        True si la sessió s'ha iniciat correctament, False en cas contrari.
-  '''
-    self.open()
-    return self.isStarted
+        Retorna:
+        --------
+        bool
+            True si la sessió s'ha iniciat correctament, False en cas contrari.
+      '''
+        self.open()
+        return self.isStarted
 
-  def showMessages(self) -> None:
-    '''
-    Mostra els missatges de sortida de la base de dades Oracle.
+    def showMessages(self) -> None:
+        '''
+        Mostra els missatges de sortida de la base de dades Oracle.
 
-    Retorna:
-    --------
-    None
-    '''
-    statusVar = self.cursor.var(NUMBER)
-    lineVar = self.cursor.var(STRING)
-    while True:
-      self.cursor.callproc("dbms_output.get_line", (lineVar, statusVar))
-      if statusVar.getvalue() != 0:
-        break
-      print(lineVar.getvalue())
+        Retorna:
+        --------
+        None
+        '''
+        statusVar = self.cursor.var(NUMBER)
+        lineVar = self.cursor.var(STRING)
+        while True:
+            self.cursor.callproc("dbms_output.get_line", (lineVar, statusVar))
+            if statusVar.getvalue() != 0:
+                break
+            print(lineVar.getvalue())
