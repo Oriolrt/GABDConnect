@@ -1,11 +1,9 @@
 name: Python package
 
 on:
-  # Trigger automàtic només per PR development → master
   pull_request:
     branches:
       - master
-  # Trigger manual (on demand)
   workflow_dispatch:
     inputs:
       tests:
@@ -15,35 +13,31 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # pot córrer en GitHub-hosted o en self-hosted
+    runs-on: ${{ matrix.runner }}
     environment: GABDConnect
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'development')
+    if: github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'pull_request' && github.base_ref == 'master' && github.head_ref == 'development')
 
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8","3.9","3.10", "3.11", "3.12"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        runner: [self-hosted]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Prepare SSH key (~/.ssh/id_student o secrets)
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest flake8 pytest-timeout
-
-      - name: Prepare SSH key
-        run: |
-          # Comprovar si existeix clau local (només útil per executar tests locals amb runner self-hosted)
-          if [ -f "../dev_keys/${{ secrets.SSH_USER }}" ]; then
-            echo "Usant clau local ../dev_keys/${{ secrets.SSH_USER }}"
-            export SSH_KEY="../dev_keys/${{ secrets.SSH_USER }}"
+          if [ -f "$HOME/.ssh/id_student" ]; then
+            echo "Trobada clau local a ~/.ssh/id_student, l'usaré"
+            export SSH_KEY="$HOME/.ssh/id_student "
           else
             echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
             chmod 600 ssh_key
@@ -53,9 +47,16 @@ jobs:
 
       - name: Test SSH connection
         run: |
-          ssh -i ssh_key -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no \
-          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami"
-          
+          ssh -i $SSH_KEY -p ${{ secrets.SSH_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest flake8 pytest-timeout
+
       - name: Lint with flake8
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
