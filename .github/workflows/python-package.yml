@@ -33,11 +33,11 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Prepare SSH key (~/.ssh/id_rsa o secrets)
+      - name: Prepare SSH key (~/.ssh/id_student o secrets)
         run: |
-          if [ -f "$HOME/.ssh/id_rsa" ]; then
-            echo "Trobada clau local a ~/.ssh/id_rsa"
-            export SSH_KEY="$HOME/.ssh/id_rsa"
+          if [ -f "$HOME/.ssh/id_student" ]; then
+            echo "Trobada clau local a ~/.ssh/id_student, l'usaré"
+            export SSH_KEY="$HOME/.ssh/id_student "
           else
             echo "${{ secrets.SSH_PRIVATE_KEY }}" > ssh_key
             chmod 600 ssh_key
