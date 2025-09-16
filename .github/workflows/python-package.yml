@@ -51,6 +51,11 @@ jobs:
           fi
           echo "SSH_KEY=$SSH_KEY" >> $GITHUB_ENV
 
+      - name: Test SSH connection
+        run: |
+          ssh -i ssh_key -p ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no \
+          ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "hostname && whoami"
+          
       - name: Lint with flake8
         run: |
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
