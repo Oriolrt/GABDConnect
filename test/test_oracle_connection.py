@@ -1,7 +1,17 @@
 import unittest
 from GABDConnect.oracleConnection import oracleConnection as orcl
+from GABDConnect.ssh_tunnel import get_free_port
 import logging
 import os
+
+USED_PORTS = {int(1521)}
+
+def get_unique_free_port():
+    port = get_free_port()
+    while port in USED_PORTS:
+        port = get_free_port()
+    USED_PORTS.add(port)
+    return port
 
 class OracleConnectTestCase(unittest.TestCase):
     def setUp(self):
@@ -34,9 +44,9 @@ class OracleConnectTestCase(unittest.TestCase):
         self.pwd = "ESPECTACLES"
 
         self.multiple_tunnels = {
-            1521: "oracle-1.grup00.gabd:1521",
-            1522: ("oracle-2.grup00.gabd", 1521),
-            2222: ("oracle-2.grup00.gabd", 22)
+            get_unique_free_port(): "oracle-1.grup00.gabd:1521",
+            get_unique_free_port(): ("oracle-2.grup00.gabd", 1521),
+            get_unique_free_port(): ("oracle-2.grup00.gabd", 22)
         }
     def test_sshtunnel_default_connection(self):
         self.client = orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
@@ -103,7 +113,7 @@ class OracleConnectTestCase(unittest.TestCase):
             )
 
     def test_consulta_basica_connection(self):
-        local_port = 1521
+        local_port = 1521 #get_unique_free_port()
 
         # Crear client Oracle amb túnel SSH
         self.client = orcl(
@@ -145,7 +155,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_dba_connection(self):
         # Configuració del test
-        local_port = 1522
+        local_port = get_unique_free_port()
         user = 'sys'
         pwd = 'oracle'
         mode = 'sysDBA'
@@ -221,17 +231,19 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        local_port_counter = 1521
+        local_port_counter = None
+
 
         for line in file.strip().split('\n'):
-
             # Split the line by spaces or tabs
             parts = line.strip().split()
             if len(parts) == 3:
                 group_name, PORT, ID_KEY = parts
                 # Create the tunnels dictionary for the current group
-                tunnels = {int(local_port_counter): f"oracle-1.{group_name}.gabd:1521",
-                           int(local_port_counter + 1): (f"oracle-2.{group_name}.gabd", 1521)}
+
+
+                tunnels = {get_unique_free_port(): f"oracle-1.{group_name}.gabd:1521",
+                           get_unique_free_port(): (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
@@ -248,7 +260,7 @@ class OracleConnectTestCase(unittest.TestCase):
                     'multiple_tunnels': tunnels.copy()
                     # 'local_port': local_port_counter # Add local_port key
                 }
-                local_port_counter += 1  # Increment local port counter
+                #local_port_counter += 1  # Increment local port counter
 
                 conn_info_oracle2 = {
                     'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
@@ -261,7 +273,7 @@ class OracleConnectTestCase(unittest.TestCase):
                     'multiple_tunnels': tunnels.copy()
                     # 'local_port': local_port_counter # Add local_port key
                 }
-                local_port_counter += 1  # Increment local port counter
+                #local_port_counter += 1  # Increment local port counter
 
                 # Store the connection information in the group_connections_info dictionary
                 group_connections_info[group_name] = [conn_info_oracle1, conn_info_oracle2]
