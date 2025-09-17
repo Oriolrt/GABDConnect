@@ -6,7 +6,14 @@ import os
 class OracleConnectTestCase(unittest.TestCase):
     def setUp(self):
         # Comprovar fitxer local de credencials o usar el fitxer creat pel workflow
-        ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
+        ssh_key_local = "../dev_keys/id_student"
+        ssh_key_home = os.path.expanduser("~/.ssh/id_student")
+
+        ssh_key_path = (
+            ssh_key_local if os.path.exists(ssh_key_local)
+            else ssh_key_home if os.path.exists(ssh_key_home)
+            else "ssh_key"
+        )
 
         # Llegir credencials del workflow si no hi ha fitxer local
         ssh_host = os.environ.get("SSH_HOST", "dcccluster.uab.cat")
@@ -46,12 +53,13 @@ class OracleConnectTestCase(unittest.TestCase):
         ssh_tunnel = self.ssh_server['ssh'] if self.ssh_server else None
         SSH_USER = self.ssh_server['user'] if self.ssh_server else None
         port = self.ssh_server['port'] if self.ssh_server else None
+        id_key = self.ssh_server['id_key'] if self.ssh_server else None
 
-        # Comprovar si existeix el fitxer local o utilitzar el fitxer creat pel workflow
-        if os.path.isfile(f"../dev_keys/id_{SSH_USER}"):
-            id_key = f"../dev_keys/id_{SSH_USER}"
-        else:
-            id_key = "ssh_key"  # fitxer creat pel workflow a partir del secret
+        # # Comprovar si existeix el fitxer local o utilitzar el fitxer creat pel workflow
+        # if os.path.isfile(f"../dev_keys/id_{SSH_USER}"):
+        #     id_key = f"../dev_keys/id_{SSH_USER}"
+        # else:
+        #     id_key = "ssh_key"  # fitxer creat pel workflow a partir del secret
 
         ssh_server = {
             'ssh': ssh_tunnel,

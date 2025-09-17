@@ -3,7 +3,6 @@ from GABDConnect import GABDSSHTunnel
 import os
 
 
-
 class GABDSSHTunnelTestCase(unittest.TestCase):
     def setUp(self):
         # Llegir config de secrets/entorn

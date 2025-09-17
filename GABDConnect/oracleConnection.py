@@ -100,6 +100,8 @@ class oracleConnection(AbsConnection):
             self.isStarted = False
             logging.error(f"Error connecting to the database with dsn: {self._dsn}")
             logging.error(f"Error: {e}")
+        finally:
+            return self.isStarted
 
 
     def close(self) -> None:
