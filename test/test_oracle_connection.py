@@ -53,12 +53,13 @@ class OracleConnectTestCase(unittest.TestCase):
         ssh_tunnel = self.ssh_server['ssh'] if self.ssh_server else None
         SSH_USER = self.ssh_server['user'] if self.ssh_server else None
         port = self.ssh_server['port'] if self.ssh_server else None
+        id_key = self.ssh_server['id_key'] if self.ssh_server else None
 
-        # Comprovar si existeix el fitxer local o utilitzar el fitxer creat pel workflow
-        if os.path.isfile(f"../dev_keys/id_{SSH_USER}"):
-            id_key = f"../dev_keys/id_{SSH_USER}"
-        else:
-            id_key = "ssh_key"  # fitxer creat pel workflow a partir del secret
+        # # Comprovar si existeix el fitxer local o utilitzar el fitxer creat pel workflow
+        # if os.path.isfile(f"../dev_keys/id_{SSH_USER}"):
+        #     id_key = f"../dev_keys/id_{SSH_USER}"
+        # else:
+        #     id_key = "ssh_key"  # fitxer creat pel workflow a partir del secret
 
         ssh_server = {
             'ssh': ssh_tunnel,
