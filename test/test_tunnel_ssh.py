@@ -32,7 +32,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
 
     def test_ssh_tunnel_connection(self):
         server = GABDSSHTunnel(hostname=self.hostname, port=self.port,
-                               ssh_data=self.ssh_server, local_port=self.local_port)
+                               ssh_data=self.ssh_server)
         server.openTunnel()
         self.assertIsNotNone(server)
         server.closeTunnel()

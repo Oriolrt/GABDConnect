@@ -12,6 +12,10 @@ import time
 
 import paramiko
 
+def get_free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))   # el 0 fa que el sistema triï un port lliure
+        return s.getsockname()[1]
 
 class sshTunnel:
     def __init__(self, ssh_address_or_host, ssh_port=22, ssh_username=None, ssh_password=None, ssh_pkey=None,

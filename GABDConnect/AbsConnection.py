@@ -19,7 +19,7 @@ warnings.filterwarnings(
     module="pydevd"
 )
 
-from .ssh_tunnel import sshTunnel
+from .ssh_tunnel import sshTunnel, get_free_port
 # from sshtunnel import SSHTunnelForwarder as sshTunnel
 
 from getpass import getpass
@@ -79,12 +79,12 @@ class GABDSSHTunnel:
             except KeyError:
                 raise KeyError(
                     f"No s'ha definit un port local per redireccionar {self.hostname}:{self._port}. S'agafarà {self._port} per defecte.")
-                self._local_port = self._port
+                self._local_port = get_free_port()
 
             self._mt[self._local_port] = (self._hostname, self._port)
         else:
-            self._mt = None
-            self._local_port = int(kwargs.pop('local_port', self._port))
+            self._local_port = int(kwargs.pop('local_port', get_free_port() ))
+            self._mt =  _format_multiple_tunnels({self._local_port:(hostname,port)})
 
     @property
     def ssh(self):
@@ -96,11 +96,11 @@ class GABDSSHTunnel:
 
     @property
     def server(self):
-        return self._server
+        return self._servers
 
     @server.setter
     def server(self, value):
-        _server = value
+        _servers = value
 
     @property
     def hostname(self):
@@ -262,11 +262,10 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
     @property
     def server(self):
-        return self._server
+        ssh_data = self._ssh_data
+        key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
+        return self._servers[key] if key in self._servers else None
 
-    @server.setter
-    def server(self, server: object):
-        self._server = server
 
     @property
     def isStarted(self):

@@ -1,7 +1,17 @@
 import unittest
 from GABDConnect.mongoConnection import mongoConnection
+from GABDConnect.ssh_tunnel import get_free_port
 import os
 from pymongo.errors import OperationFailure
+
+USED_PORTS = {int(1521)}
+
+def get_unique_free_port():
+    port = get_free_port()
+    while port in USED_PORTS:
+        port = get_free_port()
+    USED_PORTS.add(port)
+    return port
 
 
 class MongoConnectTestCase(unittest.TestCase):
@@ -44,7 +54,7 @@ class MongoConnectTestCase(unittest.TestCase):
         self.assertIsNone(self.client.conn, "MongoDB client should be closed")
 
     def test_mongoDB_local_port_connection(self):
-        self.local_port = 27018
+        self.local_port = get_unique_free_port()
         self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db, local_port=self.local_port)
         self.client.open()
         self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
@@ -67,7 +77,7 @@ class MongoConnectTestCase(unittest.TestCase):
     def test_mongoDB_crud_basic(self):
         bd_name = "test_mongo"
         col_name = "col_test"
-        local_port = 27018
+        local_port = get_unique_free_port()
         data = [{"name": "Oriol", "surname": "Ramos"},
                 {"name": "Pere", "surname": "Roca"},
                 {"name": "Anna", "surname": "Roca"}]
@@ -85,8 +95,18 @@ class MongoConnectTestCase(unittest.TestCase):
         # Insertem dades a la col·lecció
         col.insert_many(data)
 
-        # Check if the data is inserted
-        self.assertEqual(3, col.count_documents({}), "Should be able to insert data in the MongoDB database in {self.hostname} through SSH tunnel")
+        try:
+            # Check if the data is inserted
+            self.assertEqual(
+                3,
+                col.count_documents({}),
+                f"Should be able to insert data in the MongoDB database in {self.hostname} through SSH tunnel"
+            )
+        except AssertionError as e:
+            # Cleanup si el test falla
+            db.drop_collection(col_name)
+            self.client.close()
+            raise e  # torna a llençar l'error perquè el test marqui com a fallit
 
         # Fem una cerca ala col·lecció
         for doc in col.find():
@@ -104,7 +124,7 @@ class MongoConnectTestCase(unittest.TestCase):
 
     def test_user_data_connection_without_authentication(self):
         self.hostname = "mongo-1.grup00.gabd"
-        self.local_port = 27018
+        self.local_port = get_unique_free_port()
         self.user = ""
         self.pwd = ""
         self.client = mongoConnection(user=self.user, pwd=self.pwd  ,hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
@@ -118,7 +138,7 @@ class MongoConnectTestCase(unittest.TestCase):
 
     def test_user_data_connection_with_authentication(self):
         self.hostname = "main.grup00.gabd"
-        self.local_port = 27017
+        self.local_port = get_unique_free_port()
         self.user = "gestorGeonames"
         self.pwd = "gGeonames_pwd"
         self.bd = "Practica_3"
