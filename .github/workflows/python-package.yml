@@ -33,6 +33,13 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Create virtualenv
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          echo "VIRTUAL_ENV=$(pwd)/.venv" >> $GITHUB_ENV
+          echo "$(pwd)/.venv/bin" >> $GITHUB_PATH
+
       - name: Prepare SSH key (~/.ssh/id_student o secrets)
         run: |
           if [ -f "$HOME/.ssh/id_student" ]; then
@@ -80,3 +87,9 @@ jobs:
               pytest $t --timeout=600
             done
           fi
+
+      - name: Cleanup virtualenv
+        if: always()
+        run: |
+          echo "Esborrant entorn virtual..."
+          rm -rf "$VIRTUAL_ENV"
