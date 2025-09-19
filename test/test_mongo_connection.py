@@ -118,7 +118,7 @@ class MongoConnectTestCase(unittest.TestCase):
             # Eliminem la col·lecció
             db.drop_collection(col_name)
 
-            self.client.close()
+            client.close()
             # Comprovem que la connexió es tanca correctament
             self.assertIsNone(client.conn, "MongoDB client should be closed")
 

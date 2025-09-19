@@ -27,7 +27,8 @@ def is_port_available(port, host="localhost") -> bool:
             s.bind((host, port))
             return True
     except OSError:
-            return False
+        return False
+
 
 def get_free_port(host: str = "localhost") -> int:
     """Retorna un port lliure que no s'hagi utilitzat abans."""
@@ -187,9 +188,9 @@ class ForwardServer(threading.Thread):
 class SSHTunnel:
 
     def __init__(self, ssh_host: str, ssh_port: int = 22, ssh_username: Optional[str] = None,
-                     ssh_password: Optional[str] = None, ssh_pkey: Optional[str] = None,
-                     remote_bind_addresses: Optional[List[Tuple[str, int]]] = None,
-                     local_bind_addresses: Optional[List[Tuple[str, int]]] = None):
+                 ssh_password: Optional[str] = None, ssh_pkey: Optional[str] = None,
+                 remote_bind_addresses: Optional[List[Tuple[str, int]]] = None,
+                 local_bind_addresses: Optional[List[Tuple[str, int]]] = None):
 
         self.ssh_host = ssh_host
         self.ssh_port = ssh_port
@@ -219,7 +220,7 @@ class SSHTunnel:
         return self.local_bind_ports[0] if self.local_bind_ports else None
 
     def add_forward(self, remote_host: str, remote_port: int,
-                   local_host: str = "localhost", local_port: int = 0) -> int:
+                    local_host: str = "localhost", local_port: int = 0) -> int:
         """
         Afegeix un nou forward al túnel SSH existent.
         remote: (remote_host, remote_port)
@@ -250,7 +251,6 @@ class SSHTunnel:
 
                 logger.info(f"Added forward {local_host}:{actual_port} -> {remote_host}:{remote_port}")
                 return actual_port
-
 
     def remove_forward(self, local_port: int):
         """
@@ -315,7 +315,6 @@ class SSHTunnel:
             self.stop()
             raise
 
-
     def stop(self):
         """Stop the SSH tunnel and clean up resources."""
         logger.info("Stopping SSH tunnel...")
@@ -325,7 +324,6 @@ class SSHTunnel:
                 server.stop()
 
             self._forward_servers.clear()
-
 
         if self.transport:
             try:
@@ -366,7 +364,3 @@ class SSHTunnel:
                     continue
 
         return False
-
-
-
-
