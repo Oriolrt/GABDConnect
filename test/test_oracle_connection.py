@@ -37,9 +37,9 @@ class OracleConnectTestCase(unittest.TestCase):
         self.pwd = "ESPECTACLES"
 
         self.multiple_tunnels = {
-            get_free_port(): "oracle-1.grup00.gabd:1521",
-            get_free_port(): ("oracle-2.grup00.gabd", 1521),
-            get_free_port(): ("oracle-2.grup00.gabd", 22)
+            1521: "oracle-1.grup00.gabd:1521",
+            1522: ("oracle-2.grup00.gabd", 1521),
+            2222: ("oracle-2.grup00.gabd", 22)
         }
 
     def test_sshtunnel_default_connection(self):
@@ -89,6 +89,7 @@ class OracleConnectTestCase(unittest.TestCase):
             hostname=hostname,
             ssh_data=ssh_server,
             serviceName=serviceName,
+            local_port=1524,
             multiple_tunnels=self.multiple_tunnels
         ) as db:
 
@@ -113,7 +114,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_consulta_basica_connection(self):
         print("\nTest: test_consulta_basica_connection")
-        local_port = 1521  # get_free_port()
+        local_port = 1523  # get_free_port()
 
         # Crear client Oracle amb túnel SSH
         with orcl(
@@ -158,7 +159,7 @@ class OracleConnectTestCase(unittest.TestCase):
     def test_dba_connection(self):
         print("\nTest DBA connection through SSH tunnel")
         # Configuració del test
-        local_port = get_free_port()
+        local_port = 1525
         user = 'sys'
         pwd = 'oracle'
         mode = 'sysDBA'
@@ -237,7 +238,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        local_port_counter = 1521
+        local_port_counter = 1530
 
         for line in file.strip().split('\n'):
             # Split the line by spaces or tabs
