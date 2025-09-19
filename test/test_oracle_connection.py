@@ -42,14 +42,14 @@ class OracleConnectTestCase(unittest.TestCase):
         }
 
     def test_sshtunnel_default_connection(self):
-        self.client = orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
-                           passwd=self.pwd, serviceName=self.serviceName)
-        self.client.open()
-        self.assertIsNotNone(self.client, f"Should be able to connect to the Oracle database in {self.hostname} \
+        with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
+                           passwd=self.pwd, serviceName=self.serviceName) as client:
+            client.open()
+            self.assertIsNotNone(client, f"Should be able to connect to the Oracle database in {self.hostname} \
             through SSH tunnel")
 
-        self.client.close()
-        self.assertEqual(False, self.client.is_started, f"Database should be close and is {self.client.is_started}")
+            client.close()
+            self.assertEqual(False, client.is_started, f"Database should be close and is {client.is_started}")
 
     def test_tunnel_ssh_key(self):
         GRUP = "grup00"
@@ -79,38 +79,38 @@ class OracleConnectTestCase(unittest.TestCase):
         serviceName = "FREEPDB1"
 
         # Crear client Oracle amb túnel SSH
-        db = orcl(
+        with orcl(
             user=user,
             passwd=oracle_pwd,
             hostname=hostname,
             ssh_data=ssh_server,
             serviceName=serviceName,
             multiple_tunnels=self.multiple_tunnels
-        )
+        ) as db:
 
-        try:
-            # Obrir connexió
-            db.open()
-            self.assertTrue(
-                db.test_connection(),
-                f"Should be able to connect to Oracle database in {hostname} through SSH tunnel"
-            )
-            logging.warning(f"La connexió a {hostname} funciona correctament.")
-        except Exception as e:
-            self.fail(f"Failed to connect or test Oracle database: {e}")
-        finally:
-            # Tancar connexió i comprovar estat
-            db.close()
-            self.assertFalse(
-                db.is_started,
-                f"Database should be closed and isStarted is {db.is_started}"
-            )
+            try:
+                # Obrir connexió
+                db.open()
+                self.assertTrue(
+                    db.test_connection(),
+                    f"Should be able to connect to Oracle database in {hostname} through SSH tunnel"
+                )
+                logging.warning(f"La connexió a {hostname} funciona correctament.")
+            except Exception as e:
+                self.fail(f"Failed to connect or test Oracle database: {e}")
+            finally:
+                # Tancar connexió i comprovar estat
+                db.close()
+                self.assertFalse(
+                    db.is_started,
+                    f"Database should be closed and isStarted is {db.is_started}"
+                )
 
     def test_consulta_basica_connection(self):
         local_port = 1521  # get_free_port()
 
         # Crear client Oracle amb túnel SSH
-        self.client = orcl(
+        with orcl(
             hostname=self.hostname,
             port=self.port,
             ssh_data=self.ssh_server,
@@ -118,34 +118,34 @@ class OracleConnectTestCase(unittest.TestCase):
             passwd=self.pwd,
             serviceName=self.serviceName,
             local_port=local_port
-        )
+        ) as client:
 
-        # Obrir connexió
-        self.client.open()
-        self.assertTrue(
-            self.client.is_started,
-            f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel"
-        )
-
-        try:
-            # Executar consulta bàsica
-            with self.client.cursor() as curs:
-                curs.execute("""
-                SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
-                UNION
-                SELECT 'Carles' AS nom, 'Sánchez' AS cognom FROM dual
-            """)
-                for row in curs:
-                    print(row)
-        except Exception as e:
-            self.fail(f"Failed to execute basic query: {e}")
-        finally:
-            # Tancar connexió
-            self.client.close()
-            self.assertFalse(
-                self.client.is_started,
-                f"Database should be closed and isStarted is {self.client.is_started}"
+            # Obrir connexió
+            client.open()
+            self.assertTrue(
+                client.is_started,
+                f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel"
             )
+
+            try:
+                # Executar consulta bàsica
+                with client.cursor() as curs:
+                    curs.execute("""
+                    SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
+                    UNION
+                    SELECT 'Carles' AS nom, 'Sánchez' AS cognom FROM dual
+                """)
+                    for row in curs:
+                        print(row)
+            except Exception as e:
+                self.fail(f"Failed to execute basic query: {e}")
+            finally:
+                # Tancar connexió
+                client.close()
+                self.assertFalse(
+                    client.is_started,
+                    f"Database should be closed and isStarted is {client.is_started}"
+                )
 
     def test_dba_connection(self):
         # Configuració del test
@@ -156,7 +156,7 @@ class OracleConnectTestCase(unittest.TestCase):
         hostname = "oracle-2.grup00.gabd"
 
         # Crear client Oracle amb túnel SSH
-        self.client = orcl(
+        with  orcl(
             hostname=hostname,
             port=self.port,
             ssh_data=self.ssh_server,
@@ -165,51 +165,51 @@ class OracleConnectTestCase(unittest.TestCase):
             serviceName=self.serviceName,
             local_port=local_port,
             mode=mode
-        )
+        ) as client:
 
-        # Obrir connexió
-        self.client.open()
-        self.assertTrue(
-            self.client.is_started,
-            f"Should be able to connect to the Oracle database in {hostname} through SSH tunnel"
-        )
-
-        try:
-            # Executar consulta per obtenir estat de la base de dades i backups
-            with self.client.cursor() as curs:
-                curs.execute("""
-                SELECT *
-                FROM
-                (SELECT i.instance_name,
-                        i.status AS instance_status,
-                        (SELECT d.open_mode FROM v$database d) AS database_open_mode,
-                        CASE 
-                            WHEN i.status = 'STARTED' THEN 'IDLE (només instància iniciada)'
-                            WHEN i.status = 'MOUNTED' THEN 'MUNTADA (BD muntada, no oberta)'
-                            WHEN i.status = 'OPEN' AND (SELECT d.open_mode FROM v$database d) = 'READ WRITE' THEN 'OBERTA (lectura i escriptura)'
-                            WHEN i.status = 'OPEN' AND (SELECT d.open_mode FROM v$database d) LIKE 'READ ONLY%' THEN 'OBERTA (només lectura)'
-                            ELSE 'ESTAT DESCONEGUT'
-                        END AS estat_complet
-                 FROM v$instance i),
-                (SELECT COUNT(*) AS total_backups,
-                        MIN(b.completion_time) AS first_backup_date,
-                        MAX(b.completion_time) AS last_backup_date
-                 FROM v$backup_piece p
-                 JOIN v$backup_set b 
-                   ON p.set_stamp = b.set_stamp 
-                  AND p.set_count = b.set_count)
-            """)
-                for row in curs:
-                    print(row)
-        except Exception as e:
-            self.fail(f"Failed to execute database query: {e}")
-        finally:
-            # Tancar connexió
-            self.client.close()
-            self.assertFalse(
-                self.client.is_started,
-                f"Database should be closed and isStarted is {self.client.is_started}"
+            # Obrir connexió
+            client.open()
+            self.assertTrue(
+                client.is_started,
+                f"Should be able to connect to the Oracle database in {hostname} through SSH tunnel"
             )
+
+            try:
+                # Executar consulta per obtenir estat de la base de dades i backups
+                with client.cursor() as curs:
+                    curs.execute("""
+                    SELECT *
+                    FROM
+                    (SELECT i.instance_name,
+                            i.status AS instance_status,
+                            (SELECT d.open_mode FROM v$database d) AS database_open_mode,
+                            CASE 
+                                WHEN i.status = 'STARTED' THEN 'IDLE (només instància iniciada)'
+                                WHEN i.status = 'MOUNTED' THEN 'MUNTADA (BD muntada, no oberta)'
+                                WHEN i.status = 'OPEN' AND (SELECT d.open_mode FROM v$database d) = 'READ WRITE' THEN 'OBERTA (lectura i escriptura)'
+                                WHEN i.status = 'OPEN' AND (SELECT d.open_mode FROM v$database d) LIKE 'READ ONLY%' THEN 'OBERTA (només lectura)'
+                                ELSE 'ESTAT DESCONEGUT'
+                            END AS estat_complet
+                     FROM v$instance i),
+                    (SELECT COUNT(*) AS total_backups,
+                            MIN(b.completion_time) AS first_backup_date,
+                            MAX(b.completion_time) AS last_backup_date
+                     FROM v$backup_piece p
+                     JOIN v$backup_set b 
+                       ON p.set_stamp = b.set_stamp 
+                      AND p.set_count = b.set_count)
+                """)
+                    for row in curs:
+                        print(row)
+            except Exception as e:
+                self.fail(f"Failed to execute database query: {e}")
+            finally:
+                # Tancar connexió
+                client.close()
+                self.assertFalse(
+                    client.is_started,
+                    f"Database should be closed and isStarted is {client.is_started}"
+                )
 
     def test_dba_multiple_connection(self):
 
@@ -326,6 +326,7 @@ class OracleConnectTestCase(unittest.TestCase):
                 d.close()
                 self.assertEqual(False, d.is_started,
                                  f"Database should be closed and is {d.is_started}")  # add assertion here
+                del d
             except Exception as e:
                 print(f"Error closing connection: {e}")
 

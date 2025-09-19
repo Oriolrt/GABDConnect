@@ -31,32 +31,32 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         }
 
     def test_ssh_tunnel_connection(self):
-        server = GABDSSHTunnel(hostname=self.hostname, port=self.port,
-                               ssh_data=self.ssh_server)
-        server.opentunnel()
-        self.assertIsNotNone(server)
-        server.closetunnel()
+        with  GABDSSHTunnel(hostname=self.hostname, port=self.port,
+                               ssh_data=self.ssh_server) as server:
+            server.opentunnel()
+            self.assertIsNotNone(server)
+            server.closetunnel()
 
     def test_ssh_tunnel_connection_oracle_1(self):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1521
-        server = GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server,
-                               multiple_tunnels=self.multiple_tunnels)
-        server.opentunnel()
-        self.assertIsNotNone(server)
-        server.closetunnel()
-        # self.assertIsNone(server)
+        with GABDSSHTunnel(hostname=hostname, port=self.port,
+                               ssh_data=self.ssh_server, local_port=local_port,
+                               multiple_tunnels=self.multiple_tunnels) as server:
+            server.opentunnel()
+            self.assertIsNotNone(server)
+            server.closetunnel()
+            # self.assertIsNone(server)
 
     def test_ssh_tunnel_connection_oracle_2(self):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1522
-        server = GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server,
-                               multiple_tunnels=self.multiple_tunnels)
-        server.opentunnel()
-        self.assertIsNotNone(server)
-        server.closetunnel()
+        with GABDSSHTunnel(hostname=hostname, port=self.port,
+                           ssh_data=self.ssh_server, local_port=local_port,
+                           multiple_tunnels=self.multiple_tunnels) as server:
+            server.opentunnel()
+            self.assertIsNotNone(server)
+            server.closetunnel()
 
 
 if __name__ == '__main__':

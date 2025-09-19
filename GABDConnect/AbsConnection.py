@@ -122,6 +122,13 @@ class GABDSSHTunnel:
     def port(self, valor: str):
         self._port = valor
 
+    def __enter__(self):
+        self.opentunnel()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.closetunnel()
+
     def opentunnel(self):
         """
           Obre un túnel SSH utilitzant la informació d'autenticació proporcionada.
