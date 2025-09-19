@@ -55,6 +55,7 @@ class OracleConnectTestCase(unittest.TestCase):
         time.sleep(5)
 
     def test_tunnel_ssh_key(self):
+        print("\nTest SSH tunnel with SSH key")
         GRUP = "grup00"
 
         ssh_tunnel = self.ssh_server['ssh'] if self.ssh_server else None
@@ -111,6 +112,7 @@ class OracleConnectTestCase(unittest.TestCase):
                 time.sleep(5)
 
     def test_consulta_basica_connection(self):
+        print("\nTest: test_consulta_basica_connection")
         local_port = 1521  # get_free_port()
 
         # Crear client Oracle amb túnel SSH
@@ -154,6 +156,7 @@ class OracleConnectTestCase(unittest.TestCase):
         time.sleep(5)
 
     def test_dba_connection(self):
+        print("\nTest DBA connection through SSH tunnel")
         # Configuració del test
         local_port = get_free_port()
         user = 'sys'
@@ -220,6 +223,7 @@ class OracleConnectTestCase(unittest.TestCase):
         time.sleep(5)
 
     def test_dba_multiple_connection(self):
+        print("\nTest multiple DBA connections through SSH tunnels")
 
         self.user = 'sys'
         self.pwd = 'oracle'
@@ -300,30 +304,30 @@ class OracleConnectTestCase(unittest.TestCase):
             try:
                 with d.cursor() as curs:
                     curs.execute("""select *
-          from
-          (SELECT i.instance_name,
-           i.status AS instance_status,
-           (SELECT d.open_mode FROM v$database d) AS database_open_mode,
-           CASE 
-             WHEN i.status = 'STARTED' THEN 'IDLE (només instància iniciada)'
-             WHEN i.status = 'MOUNTED' THEN 'MUNTADA (BD muntada, no oberta)'
-             WHEN i.status = 'OPEN' 
-                  AND (SELECT d.open_mode FROM v$database d) = 'READ WRITE'
-                  THEN 'OBERTA (lectura i escriptura)'
-             WHEN i.status = 'OPEN' 
-                  AND (SELECT d.open_mode FROM v$database d) LIKE 'READ ONLY%'
-                  THEN 'OBERTA (només lectura)'
-             ELSE 'ESTAT DESCONEGUT'
-           END AS estat_complet
-           FROM   v$instance i),
-           (SELECT COUNT(*)              AS total_backups,
-             MIN(b.completion_time) AS first_backup_date,
-             MAX(b.completion_time) AS last_backup_date
-            FROM   v$backup_piece p
-             JOIN   v$backup_set b 
-             ON p.set_stamp = b.set_stamp 
-            AND p.set_count = b.set_count)
-          """)
+                          from
+                          (SELECT i.instance_name,
+                           i.status AS instance_status,
+                           (SELECT d.open_mode FROM v$database d) AS database_open_mode,
+                           CASE 
+                             WHEN i.status = 'STARTED' THEN 'IDLE (només instància iniciada)'
+                             WHEN i.status = 'MOUNTED' THEN 'MUNTADA (BD muntada, no oberta)'
+                             WHEN i.status = 'OPEN' 
+                                  AND (SELECT d.open_mode FROM v$database d) = 'READ WRITE'
+                                  THEN 'OBERTA (lectura i escriptura)'
+                             WHEN i.status = 'OPEN' 
+                                  AND (SELECT d.open_mode FROM v$database d) LIKE 'READ ONLY%'
+                                  THEN 'OBERTA (només lectura)'
+                             ELSE 'ESTAT DESCONEGUT'
+                           END AS estat_complet
+                           FROM   v$instance i),
+                           (SELECT COUNT(*)              AS total_backups,
+                             MIN(b.completion_time) AS first_backup_date,
+                             MAX(b.completion_time) AS last_backup_date
+                            FROM   v$backup_piece p
+                             JOIN   v$backup_set b 
+                             ON p.set_stamp = b.set_stamp 
+                            AND p.set_count = b.set_count)
+                          """)
                     for row in curs:
                         print(row)
             except Exception:
