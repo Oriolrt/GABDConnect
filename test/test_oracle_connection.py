@@ -4,14 +4,6 @@ from GABDConnect.ssh_tunnel import get_free_port
 import logging
 import os
 
-USED_PORTS = {int(1521)}
-
-def get_unique_free_port():
-    port = get_free_port()
-    while port in USED_PORTS:
-        port = get_free_port()
-    USED_PORTS.add(port)
-    return port
 
 class OracleConnectTestCase(unittest.TestCase):
     def setUp(self):
@@ -44,18 +36,20 @@ class OracleConnectTestCase(unittest.TestCase):
         self.pwd = "ESPECTACLES"
 
         self.multiple_tunnels = {
-            get_unique_free_port(): "oracle-1.grup00.gabd:1521",
-            get_unique_free_port(): ("oracle-2.grup00.gabd", 1521),
-            get_unique_free_port(): ("oracle-2.grup00.gabd", 22)
+            get_free_port(): "oracle-1.grup00.gabd:1521",
+            get_free_port(): ("oracle-2.grup00.gabd", 1521),
+            get_free_port(): ("oracle-2.grup00.gabd", 22)
         }
+
     def test_sshtunnel_default_connection(self):
         self.client = orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
                            passwd=self.pwd, serviceName=self.serviceName)
         self.client.open()
-        self.assertIsNotNone(self.client, f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel")
+        self.assertIsNotNone(self.client, f"Should be able to connect to the Oracle database in {self.hostname} \
+            through SSH tunnel")
 
         self.client.close()
-        self.assertEqual(False, self.client.isStarted, f"Database should be close and is {self.client.isStarted}")  # add assertion here
+        self.assertEqual(False, self.client.is_started, f"Database should be close and is {self.client.is_started}")
 
     def test_tunnel_ssh_key(self):
         GRUP = "grup00"
@@ -98,7 +92,7 @@ class OracleConnectTestCase(unittest.TestCase):
             # Obrir connexió
             db.open()
             self.assertTrue(
-                db.testConnection(),
+                db.test_connection(),
                 f"Should be able to connect to Oracle database in {hostname} through SSH tunnel"
             )
             logging.warning(f"La connexió a {hostname} funciona correctament.")
@@ -108,12 +102,12 @@ class OracleConnectTestCase(unittest.TestCase):
             # Tancar connexió i comprovar estat
             db.close()
             self.assertFalse(
-                db.isStarted,
-                f"Database should be closed and isStarted is {db.isStarted}"
+                db.is_started,
+                f"Database should be closed and isStarted is {db.is_started}"
             )
 
     def test_consulta_basica_connection(self):
-        local_port = 1521 #get_unique_free_port()
+        local_port = 1521  # get_free_port()
 
         # Crear client Oracle amb túnel SSH
         self.client = orcl(
@@ -129,7 +123,7 @@ class OracleConnectTestCase(unittest.TestCase):
         # Obrir connexió
         self.client.open()
         self.assertTrue(
-            self.client.isStarted,
+            self.client.is_started,
             f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel"
         )
 
@@ -149,13 +143,13 @@ class OracleConnectTestCase(unittest.TestCase):
             # Tancar connexió
             self.client.close()
             self.assertFalse(
-                self.client.isStarted,
-                f"Database should be closed and isStarted is {self.client.isStarted}"
+                self.client.is_started,
+                f"Database should be closed and isStarted is {self.client.is_started}"
             )
 
     def test_dba_connection(self):
         # Configuració del test
-        local_port = get_unique_free_port()
+        local_port = get_free_port()
         user = 'sys'
         pwd = 'oracle'
         mode = 'sysDBA'
@@ -176,7 +170,7 @@ class OracleConnectTestCase(unittest.TestCase):
         # Obrir connexió
         self.client.open()
         self.assertTrue(
-            self.client.isStarted,
+            self.client.is_started,
             f"Should be able to connect to the Oracle database in {hostname} through SSH tunnel"
         )
 
@@ -213,15 +207,15 @@ class OracleConnectTestCase(unittest.TestCase):
             # Tancar connexió
             self.client.close()
             self.assertFalse(
-                self.client.isStarted,
-                f"Database should be closed and isStarted is {self.client.isStarted}"
+                self.client.is_started,
+                f"Database should be closed and isStarted is {self.client.is_started}"
             )
 
     def test_dba_multiple_connection(self):
 
-        self.user= 'sys'
-        self.pwd= 'oracle'
-        self.mode='sysDBA'
+        self.user = 'sys'
+        self.pwd = 'oracle'
+        self.mode = 'sysDBA'
         self.ssh_server['port'] = 8192
         self.hostname = None
         self.multiple_tunnels = None
@@ -231,8 +225,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        local_port_counter = None
-
+        # local_port_counter = None
 
         for line in file.strip().split('\n'):
             # Split the line by spaces or tabs
@@ -241,9 +234,8 @@ class OracleConnectTestCase(unittest.TestCase):
                 group_name, PORT, ID_KEY = parts
                 # Create the tunnels dictionary for the current group
 
-
-                tunnels = {get_unique_free_port(): f"oracle-1.{group_name}.gabd:1521",
-                           get_unique_free_port(): (f"oracle-2.{group_name}.gabd", 1521)}
+                tunnels = {get_free_port(): f"oracle-1.{group_name}.gabd:1521",
+                           get_free_port(): (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
@@ -253,27 +245,29 @@ class OracleConnectTestCase(unittest.TestCase):
                     'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
                     'passwd': self.pwd,  # Assuming 'oracle_pwd' is defined in R9NyUeLD7ieV
                     'hostname': f"oracle-1.{group_name}.gabd",
-                    'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY, 'port': int(PORT)},
+                    'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY,
+                                 'port': int(PORT)},
                     # Updated ssh_data,
                     'serviceName': self.serviceName,  # Assuming 'serviceName' is defined in R9NyUeLD7ieV
                     'mode': self.mode,  # Assuming 'mode' is defined in R9NyUeLD7ieV
                     'multiple_tunnels': tunnels.copy()
                     # 'local_port': local_port_counter # Add local_port key
                 }
-                #local_port_counter += 1  # Increment local port counter
+                # local_port_counter += 1  # Increment local port counter
 
                 conn_info_oracle2 = {
                     'user': self.user,  # Assuming 'user' is defined in R9NyUeLD7ieV
                     'passwd': self.pwd,  # Assuming 'oracle_pwd' is defined in R9NyUeLD7ieV
                     'hostname': f"oracle-2.{group_name}.gabd",
-                    'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY, 'port': int(PORT)},
+                    'ssh_data': {'ssh': self.ssh_server['ssh'], 'user': self.ssh_server['user'], 'id_key': ID_KEY,
+                                 'port': int(PORT)},
                     # Updated ssh_data
                     'serviceName': self.serviceName,  # Assuming 'serviceName' is defined in R9NyUeLD7ieV
                     'mode': self.mode,  # Assuming 'mode' is defined in R9NyUeLD7ieV
-                    'multiple_tunnels': tunnels.copy()
+                    'multiple_tunnels': tunnels
                     # 'local_port': local_port_counter # Add local_port key
                 }
-                #local_port_counter += 1  # Increment local port counter
+                # local_port_counter += 1  # Increment local port counter
 
                 # Store the connection information in the group_connections_info dictionary
                 group_connections_info[group_name] = [conn_info_oracle1, conn_info_oracle2]
@@ -289,11 +283,10 @@ class OracleConnectTestCase(unittest.TestCase):
                 # Create the database connection object using the information in conn_info
                 d = orcl(**conn_info)
                 # Open connection
-                if not d.isStarted:
+                if not d.is_started:
                     d.open()
                 # Append the connection object to the all_dbs list
                 all_dbs.append(d)
-
 
         for d in all_dbs:
             try:
@@ -325,19 +318,16 @@ class OracleConnectTestCase(unittest.TestCase):
           """)
                     for row in curs:
                         print(row)
-            except Exception as e:
+            except Exception:
                 pass
 
         for d in all_dbs:
             try:
                 d.close()
-                self.assertEqual(False, d.isStarted,
-                                 f"Database should be closed and is {d.isStarted}")  # add assertion here
+                self.assertEqual(False, d.is_started,
+                                 f"Database should be closed and is {d.is_started}")  # add assertion here
             except Exception as e:
                 print(f"Error closing connection: {e}")
-
-
-
 
 
 if __name__ == '__main__':

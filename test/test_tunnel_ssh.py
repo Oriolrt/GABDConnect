@@ -9,7 +9,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         ssh_host = os.environ.get("SSH_HOST")
         ssh_user = os.environ.get("SSH_USER")
         ssh_pwd = os.environ.get("SSH_PWD")
-        ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
+        # ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
         ssh_port = int(os.environ.get("SSH_PORT", 22))
 
         if not all([ssh_host, ssh_user, ssh_pwd]):
@@ -33,9 +33,9 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
     def test_ssh_tunnel_connection(self):
         server = GABDSSHTunnel(hostname=self.hostname, port=self.port,
                                ssh_data=self.ssh_server)
-        server.openTunnel()
+        server.opentunnel()
         self.assertIsNotNone(server)
-        server.closeTunnel()
+        server.closetunnel()
 
     def test_ssh_tunnel_connection_oracle_1(self):
         hostname = "oracle-1.grup00.gabd"
@@ -43,9 +43,10 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         server = GABDSSHTunnel(hostname=hostname, port=self.port,
                                ssh_data=self.ssh_server, local_port=local_port,
                                multiple_tunnels=self.multiple_tunnels)
-        server.openTunnel()
+        server.opentunnel()
         self.assertIsNotNone(server)
-        server.closeTunnel()
+        server.closetunnel()
+        # self.assertIsNone(server)
 
     def test_ssh_tunnel_connection_oracle_2(self):
         hostname = "oracle-1.grup00.gabd"
@@ -53,9 +54,9 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         server = GABDSSHTunnel(hostname=hostname, port=self.port,
                                ssh_data=self.ssh_server, local_port=local_port,
                                multiple_tunnels=self.multiple_tunnels)
-        server.openTunnel()
+        server.opentunnel()
         self.assertIsNotNone(server)
-        server.closeTunnel()
+        server.closetunnel()
 
 
 if __name__ == '__main__':

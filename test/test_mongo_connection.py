@@ -47,7 +47,7 @@ class MongoConnectTestCase(unittest.TestCase):
         self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
 
         self.client.open()
-        self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
+        self.assertTrue(self.client.test_connection(), "La connexió ha fallat")
         self.assertIsNotNone(self.client.conn, "MongoDB client should be initialized")
         self.client.close()
         # Comprovem que la connexió es tanca correctament
@@ -57,7 +57,7 @@ class MongoConnectTestCase(unittest.TestCase):
         self.local_port = get_unique_free_port()
         self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db, local_port=self.local_port)
         self.client.open()
-        self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
+        self.assertTrue(self.client.test_connection(), "La connexió ha fallat")
         self.assertIsNotNone(self.client.conn, "MongoDB client should be initialized")
         self.client.close()
         # Comprovem que la connexió es tanca correctament
@@ -67,7 +67,7 @@ class MongoConnectTestCase(unittest.TestCase):
         self.hostname = "main.grup00.gabd"
         self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
         self.client.open()
-        self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
+        self.assertTrue(self.client.test_connection(), "La connexió ha fallat")
         db = self.client.conn[self.client.bd_name]
         self.assertIsNotNone(db, f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
         self.client.close()

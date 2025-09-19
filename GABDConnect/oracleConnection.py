@@ -94,14 +94,14 @@ class oracleConnection(AbsConnection):
         try:
             self.conn = connect(self._dsn,**self._con_params)
             self._cursor = self.conn.cursor()
-            self.isStarted = True
+            self.is_started = True
         except DatabaseError as e:
             #self.closeTunnel()
-            self.isStarted = False
+            self.is_started = False
             logging.error(f"Error connecting to the database with dsn: {self._dsn}")
             logging.error(f"Error: {e}")
         finally:
-            return self.isStarted
+            return self.is_started
 
 
     def close(self) -> None:
@@ -114,8 +114,8 @@ class oracleConnection(AbsConnection):
         '''
         try:
             self.conn.close()
-            self.closeTunnel()
-            self.isStarted = False
+            self.closetunnel()
+            self.is_started = False
         except DatabaseError:
             logging.warning('Database connection already closed')
         except AttributeError as e:
@@ -133,7 +133,7 @@ class oracleConnection(AbsConnection):
         '''
         self.conn.commit()
 
-    def testConnection(self) -> bool:
+    def test_connection(self) -> bool:
         '''
         Prova la connexió a la base de dades Oracle.
 
