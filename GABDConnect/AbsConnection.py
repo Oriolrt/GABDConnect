@@ -13,6 +13,7 @@ Aquest script forma part del material didàctic de l'assignatura de Gestió i Ad
 import warnings
 from abc import ABC, abstractmethod
 
+
 warnings.filterwarnings(
     "ignore",
     category=DeprecationWarning,
@@ -225,6 +226,7 @@ class GABDSSHTunnel:
             print(f"[INFO] Forwards {local_ports} eliminats, túnel SSH segueix actiu amb altres forwards.")
 
 
+
 class AbsConnection(ABC, GABDSSHTunnel):
     """
     Aquesta classe abstracta emmagatzema informació bàsica de connexió i mètodes per connectar-se a DBMS.
@@ -351,3 +353,5 @@ class AbsConnection(ABC, GABDSSHTunnel):
               True si la connexió és correcta, False en cas contrari.
         """
         pass
+
+
