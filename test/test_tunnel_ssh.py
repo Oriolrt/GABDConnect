@@ -41,7 +41,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1521
         server = GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server, local_port=local_port,
+                               ssh_data=self.ssh_server,
                                multiple_tunnels=self.multiple_tunnels)
         server.opentunnel()
         self.assertIsNotNone(server)
@@ -52,7 +52,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1522
         server = GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server, local_port=local_port,
+                               ssh_data=self.ssh_server,
                                multiple_tunnels=self.multiple_tunnels)
         server.opentunnel()
         self.assertIsNotNone(server)

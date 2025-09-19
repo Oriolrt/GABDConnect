@@ -225,7 +225,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        # local_port_counter = None
+        local_port_counter = 1521
 
         for line in file.strip().split('\n'):
             # Split the line by spaces or tabs
@@ -234,8 +234,8 @@ class OracleConnectTestCase(unittest.TestCase):
                 group_name, PORT, ID_KEY = parts
                 # Create the tunnels dictionary for the current group
 
-                tunnels = {get_free_port(): f"oracle-1.{group_name}.gabd:1521",
-                           get_free_port(): (f"oracle-2.{group_name}.gabd", 1521)}
+                tunnels = {local_port_counter: f"oracle-1.{group_name}.gabd:1521",
+                           local_port_counter+1: (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
@@ -267,7 +267,7 @@ class OracleConnectTestCase(unittest.TestCase):
                     'multiple_tunnels': tunnels
                     # 'local_port': local_port_counter # Add local_port key
                 }
-                # local_port_counter += 1  # Increment local port counter
+                local_port_counter += 2  # Increment local port counter
 
                 # Store the connection information in the group_connections_info dictionary
                 group_connections_info[group_name] = [conn_info_oracle1, conn_info_oracle2]

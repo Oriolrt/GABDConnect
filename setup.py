@@ -8,13 +8,13 @@ here = os.path.abspath(os.path.dirname(__file__))
 with codecs.open(os.path.join(here, "README.md"), encoding="utf-8") as fh:
     long_description = "\n" + fh.read()
 
-VERSION = '3.1.3'
+version="3.1.3"
 DESCRIPTION = 'Classes to connect to Oracle and MongoDB server directly or through ssh tunneling.'
 
 # Setting up
 setup(
     name="GABDConnect",
-    version=VERSION,
+    version=version,
     author="Oriol Ramos Terrades, Carles Sanchez",
     author_email="{oriol.ramos,carlos.sanchez.ramos}@uab.cat",
     description=DESCRIPTION,
