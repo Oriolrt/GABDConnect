@@ -25,8 +25,8 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
             'port': ssh_port,
         }
         self.multiple_tunnels = {
-            1521: "oracle-1.grup00.gabd:1521",
-            1522: ("oracle-2.grup00.gabd", 1521),
+            1621: "oracle-1.grup00.gabd:1521",
+            1622: ("oracle-2.grup00.gabd", 1521),
             2222: ("oracle-2.grup00.gabd", 22)
         }
 
