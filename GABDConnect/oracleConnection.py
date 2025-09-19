@@ -93,8 +93,13 @@ class oracleConnection(AbsConnection):
 
         try:
             self.conn = connect(self._dsn,**self._con_params)
-            self._cursor = self.conn.cursor()
-            self.is_started = True
+            if self.conn is not None:
+                self._cursor = self.conn.cursor()
+                self.is_started = True
+            else:
+                self.is_started = False
+                raise RuntimeError("Could not connect to the database. Check the connection parameters and its status.")
+
         except DatabaseError as e:
             #self.closeTunnel()
             self.is_started = False
