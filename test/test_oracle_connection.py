@@ -1,3 +1,4 @@
+import time
 import unittest
 from GABDConnect.oracleConnection import oracleConnection as orcl
 from GABDConnect.ssh_tunnel import get_free_port
@@ -50,6 +51,8 @@ class OracleConnectTestCase(unittest.TestCase):
 
             client.close()
             self.assertEqual(False, client.is_started, f"Database should be close and is {client.is_started}")
+
+        time.sleep(5)
 
     def test_tunnel_ssh_key(self):
         GRUP = "grup00"
@@ -105,6 +108,7 @@ class OracleConnectTestCase(unittest.TestCase):
                     db.is_started,
                     f"Database should be closed and isStarted is {db.is_started}"
                 )
+                time.sleep(5)
 
     def test_consulta_basica_connection(self):
         local_port = 1521  # get_free_port()
@@ -146,6 +150,8 @@ class OracleConnectTestCase(unittest.TestCase):
                     client.is_started,
                     f"Database should be closed and isStarted is {client.is_started}"
                 )
+
+        time.sleep(5)
 
     def test_dba_connection(self):
         # Configuració del test
@@ -210,6 +216,8 @@ class OracleConnectTestCase(unittest.TestCase):
                     client.is_started,
                     f"Database should be closed and isStarted is {client.is_started}"
                 )
+
+        time.sleep(5)
 
     def test_dba_multiple_connection(self):
 
@@ -329,6 +337,8 @@ class OracleConnectTestCase(unittest.TestCase):
                 del d
             except Exception as e:
                 print(f"Error closing connection: {e}")
+
+        time.sleep(5)
 
 
 if __name__ == '__main__':
