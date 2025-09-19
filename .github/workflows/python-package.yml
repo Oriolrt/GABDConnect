@@ -4,9 +4,9 @@ on:
    pull_request:
       branches:
         - master
-    workflow_dispatch:
+   workflow_dispatch:
       inputs:
-        tests:
+        build:
           description: "Quins tests executar? Coma-separats o 'all'"
           required: false
           default: "all"
