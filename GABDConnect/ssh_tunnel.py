@@ -240,14 +240,16 @@ class SSHTunnel:
                 if not (server.remote_host == remote_host and server.remote_port == remote_port):
                     raise RuntimeError(f"Port {local_port} is already forwarded")
 
-            actual_port = self._start_forward(local_port, remote_host, remote_port)
+                return local_port  # Already forwarded to the same remote
+            else:
+                actual_port = self._start_forward(local_port, remote_host, remote_port)
 
-            # Guardar el mapping
-            self.remote_bind_addresses.append((remote_host, remote_port))
-            self.local_bind_addresses.append((local_host, actual_port))
+                # Guardar el mapping
+                self.remote_bind_addresses.append((remote_host, remote_port))
+                self.local_bind_addresses.append((local_host, actual_port))
 
-            logger.info(f"Added forward {local_host}:{actual_port} -> {remote_host}:{remote_port}")
-            return actual_port
+                logger.info(f"Added forward {local_host}:{actual_port} -> {remote_host}:{remote_port}")
+                return actual_port
 
 
     def remove_forward(self, local_port: int):
