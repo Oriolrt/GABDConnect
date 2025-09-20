@@ -1,5 +1,6 @@
 import unittest
 from GABDConnect import GABDSSHTunnel
+from GABDConnect.ssh_tunnel import get_free_port
 import os
 
 
@@ -25,9 +26,9 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
             'port': ssh_port,
         }
         self.multiple_tunnels = {
-            1621: "oracle-1.grup00.gabd:1521",
-            1622: ("oracle-2.grup00.gabd", 1521),
-            2222: ("oracle-2.grup00.gabd", 22)
+            get_free_port(): "oracle-1.grup00.gabd:1521",
+            get_free_port(): ("oracle-2.grup00.gabd", 1521),
+            get_free_port(): ("oracle-2.grup00.gabd", 22)
         }
 
     def test_ssh_tunnel_connection(self):
@@ -41,7 +42,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1521
         with GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server, local_port=local_port,
+                               ssh_data=self.ssh_server,
                                multiple_tunnels=self.multiple_tunnels) as server:
             server.opentunnel()
             self.assertIsNotNone(server)
@@ -52,7 +53,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1522
         with GABDSSHTunnel(hostname=hostname, port=self.port,
-                           ssh_data=self.ssh_server, local_port=local_port,
+                           ssh_data=self.ssh_server,
                            multiple_tunnels=self.multiple_tunnels) as server:
             server.opentunnel()
             self.assertIsNotNone(server)

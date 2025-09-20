@@ -37,9 +37,9 @@ class OracleConnectTestCase(unittest.TestCase):
         self.pwd = "ESPECTACLES"
 
         self.multiple_tunnels = {
-            1521: "oracle-1.grup00.gabd:1521",
-            1522: ("oracle-2.grup00.gabd", 1521),
-            2222: ("oracle-2.grup00.gabd", 22)
+            get_free_port(): "oracle-1.grup00.gabd:1521",
+            get_free_port(): ("oracle-2.grup00.gabd", 1521),
+            get_free_port(): ("oracle-2.grup00.gabd", 22)
         }
 
     def test_sshtunnel_default_connection(self):
@@ -89,7 +89,6 @@ class OracleConnectTestCase(unittest.TestCase):
             hostname=hostname,
             ssh_data=ssh_server,
             serviceName=serviceName,
-            local_port=1524,
             multiple_tunnels=self.multiple_tunnels
         ) as db:
 
@@ -115,7 +114,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_consulta_basica_connection(self):
         print("\nTest: test_consulta_basica_connection")
-        local_port = 1523  # get_free_port()
+        local_port = get_free_port()
 
         # Crear client Oracle amb túnel SSH
         with orcl(
@@ -124,8 +123,7 @@ class OracleConnectTestCase(unittest.TestCase):
             ssh_data=self.ssh_server,
             user=self.user,
             passwd=self.pwd,
-            serviceName=self.serviceName,
-            local_port=local_port
+            serviceName=self.serviceName
         ) as client:
 
             # Obrir connexió
@@ -174,7 +172,6 @@ class OracleConnectTestCase(unittest.TestCase):
             user=user,
             passwd=pwd,
             serviceName=self.serviceName,
-            local_port=local_port,
             mode=mode
         ) as client:
 
@@ -248,8 +245,8 @@ class OracleConnectTestCase(unittest.TestCase):
                 group_name, PORT, ID_KEY = parts
                 # Create the tunnels dictionary for the current group
 
-                tunnels = {local_port_counter: f"oracle-1.{group_name}.gabd:1521",
-                           local_port_counter+1: (f"oracle-2.{group_name}.gabd", 1521)}
+                tunnels = {get_free_port(): f"oracle-1.{group_name}.gabd:1521",
+                           get_free_port(): (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
