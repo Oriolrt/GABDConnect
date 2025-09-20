@@ -51,7 +51,7 @@ class mongoConnection(AbsConnection):
 
     @property
     def bd(self):
-        if not self.isStarted:
+        if not self.is_started:
             self.startSession()
 
         return super(mongoConnection, self).bd
@@ -83,12 +83,12 @@ class mongoConnection(AbsConnection):
         try:
             self.conn = MongoClient(self._mongo_uri, serverSelectionTimeoutMS=100)
             self.conn.server_info()  # force connection on a request as the  # connect=True parameter of MongoClient seems  # to be useless here
-            self.isStarted = True
+            self.is_started = True
             self.bd = self.conn[self.bd_name]
             print("Connexió a MongoDB oberta.")
         except ServerSelectionTimeoutError as err:
-            self.closeTunnel()
-            self.isStarted = False
+            self.closetunnel()
+            self.is_started = False
             # do whatever you need
             print(err)
 
@@ -110,8 +110,8 @@ class mongoConnection(AbsConnection):
                 print("[WARN] No hi havia connexió MongoDB activa.")
 
             # Tancar el forward/túnel associat
-            self.closeTunnel()
-            self.isStarted = False
+            self.closetunnel()
+            self.is_started = False
 
         except errors.PyMongoError as e:
             print(f"[ERROR] Error en tancar la connexió MongoDB: {e}")
@@ -121,7 +121,7 @@ class mongoConnection(AbsConnection):
         finally:
             self.conn = None
             self.bd = None
-            self.isStarted = False
+            self.is_started = False
 
     def startSession(self):
         """
@@ -133,9 +133,9 @@ class mongoConnection(AbsConnection):
             True si la sessió s'ha iniciat correctament, False en cas contrari.
         """
         self.open()
-        return self.isStarted
+        return self.is_started
 
-    def testConnection(self):
+    def test_connection(self):
         """
         Prova la connexió a la base de dades MongoDB.
 

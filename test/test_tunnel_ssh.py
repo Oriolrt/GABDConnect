@@ -1,5 +1,6 @@
 import unittest
 from GABDConnect import GABDSSHTunnel
+from GABDConnect.ssh_tunnel import get_free_port
 import os
 
 
@@ -9,7 +10,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         ssh_host = os.environ.get("SSH_HOST")
         ssh_user = os.environ.get("SSH_USER")
         ssh_pwd = os.environ.get("SSH_PWD")
-        ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
+        # ssh_key_path = "../dev_keys/id_student" if os.path.exists("../dev_keys/id_student") else "ssh_key"
         ssh_port = int(os.environ.get("SSH_PORT", 22))
 
         if not all([ssh_host, ssh_user, ssh_pwd]):
@@ -25,37 +26,38 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
             'port': ssh_port,
         }
         self.multiple_tunnels = {
-            1521: "oracle-1.grup00.gabd:1521",
-            1522: ("oracle-2.grup00.gabd", 1521),
-            2222: ("oracle-2.grup00.gabd", 22)
+            get_free_port(): "oracle-1.grup00.gabd:1521",
+            get_free_port(): ("oracle-2.grup00.gabd", 1521),
+            get_free_port(): ("oracle-2.grup00.gabd", 22)
         }
 
     def test_ssh_tunnel_connection(self):
-        server = GABDSSHTunnel(hostname=self.hostname, port=self.port,
-                               ssh_data=self.ssh_server)
-        server.openTunnel()
-        self.assertIsNotNone(server)
-        server.closeTunnel()
+        with  GABDSSHTunnel(hostname=self.hostname, port=self.port,
+                               ssh_data=self.ssh_server) as server:
+            server.opentunnel()
+            self.assertIsNotNone(server)
+            server.closetunnel()
 
     def test_ssh_tunnel_connection_oracle_1(self):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1521
-        server = GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server, local_port=local_port,
-                               multiple_tunnels=self.multiple_tunnels)
-        server.openTunnel()
-        self.assertIsNotNone(server)
-        server.closeTunnel()
+        with GABDSSHTunnel(hostname=hostname, port=self.port,
+                               ssh_data=self.ssh_server,
+                               multiple_tunnels=self.multiple_tunnels) as server:
+            server.opentunnel()
+            self.assertIsNotNone(server)
+            server.closetunnel()
+            # self.assertIsNone(server)
 
     def test_ssh_tunnel_connection_oracle_2(self):
         hostname = "oracle-1.grup00.gabd"
         local_port = 1522
-        server = GABDSSHTunnel(hostname=hostname, port=self.port,
-                               ssh_data=self.ssh_server, local_port=local_port,
-                               multiple_tunnels=self.multiple_tunnels)
-        server.openTunnel()
-        self.assertIsNotNone(server)
-        server.closeTunnel()
+        with GABDSSHTunnel(hostname=hostname, port=self.port,
+                           ssh_data=self.ssh_server,
+                           multiple_tunnels=self.multiple_tunnels) as server:
+            server.opentunnel()
+            self.assertIsNotNone(server)
+            server.closetunnel()
 
 
 if __name__ == '__main__':
