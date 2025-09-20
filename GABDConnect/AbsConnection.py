@@ -16,7 +16,8 @@ l'administració segura i eficient de bases de dades en entorns distribuïts.
 import warnings
 from abc import ABC, abstractmethod
 from .ssh_tunnel import SSHTunnel, get_free_port
-# from sshtunnel import SSHTunnelForwarder as sshTunnel
+from contextlib import closing
+from typing import Tuple, List, Optional, Dict, Any
 
 from getpass import getpass
 
@@ -42,6 +43,9 @@ def _format_multiple_tunnels(mt: dict) -> dict:
         res[kk] = vv
 
     return res
+
+
+
 
 
 class GABDSSHTunnel:
@@ -201,19 +205,14 @@ class GABDSSHTunnel:
 
         print(f"ssh -L {forwards} {ssh_data['user']}@{ssh_data['ssh']} -p {ssh_data['port']}")
 
-    def closetunnel(self):
+    def closetunnel(self) -> bool | None:
         """
           Tanca el forward associat a aquesta connexió Oracle.
           Si és l'últim forward d'un túnel SSH, tanca també el túnel.
           """
-        if self._ssh_data is None:
-            print("[WARN] No hi ha dades SSH per tancar túnel")
-            return
 
-        ssh_data = self._ssh_data
-        key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
+        tunnel = self.get_tunnel()
 
-        tunnel = GABDSSHTunnel._servers.get(key)
         if not tunnel:
             print("[WARN] No s'ha trobat cap túnel actiu per tancar")
             return
@@ -233,12 +232,120 @@ class GABDSSHTunnel:
         # Si no queden forwards, tanquem completament el túnel
         if not tunnel.local_bind_addresses:
             tunnel.stop()
-            GABDSSHTunnel._servers.pop(key, None)
-            GABDSSHTunnel._num_connections -= 1
-            print(f"[INFO] Túnel SSH {ssh_data['ssh']}:{ssh_data['port']} tancat (sense forwards restants).")
+            GABDSSHTunnel.pop(tunnel)
+            print(f"[INFO] Túnel SSH {tunnel} tancat (sense forwards restants).")
         else:
             print(f"[INFO] Forwards {local_ports} eliminats, túnel SSH segueix actiu amb altres forwards.")
 
+        return True
+
+    def is_active(self) -> bool:
+        """Retorna si el túnel SSH està actiu."""
+        if self._ssh_data is None:
+            return False
+
+        ssh_data = self._ssh_data
+        key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
+
+        tunnel = GABDSSHTunnel._servers.get(key)
+        return tunnel.is_active() if tunnel else False
+
+    def _make_key(self):
+        """Construeix la clau (ssh, port, user) a partir de self._ssh_data."""
+        if self._ssh_data is None:
+            print("[WARN] No hi ha dades SSH per construir la clau")
+            return None
+        return (
+            self._ssh_data["ssh"],
+            int(self._ssh_data["port"]),
+            self._ssh_data["user"],
+        )
+
+    def get_tunnel(self):
+        """Retorna el túnel associat a self._ssh_data, si existeix."""
+        key = self._make_key()
+        if key is None:
+            return None
+        return GABDSSHTunnel._servers.get(key)
+
+    @classmethod
+    def get(cls, ssh: str, port: int, user: str):
+        """Accedeix al túnel actiu amb clau (ssh, port, user)."""
+        key = (ssh, int(port), user)
+        return cls._servers.get(key)
+
+    def is_tunnel_close(self) -> bool:
+        """Retorna si el túnel SSH està tancat."""
+
+        return not self.get_tunnel().is_active()
+
+    def __delitem__(self, key):
+        """
+        Permet eliminar un túnel amb del t[ssh, port, user].
+        """
+        if not isinstance(key, tuple) or len(key) != 3:
+            raise KeyError("La clau ha de ser (ssh, port, user)")
+        ssh, port, user = key
+        GABDSSHTunnel._servers.pop((ssh, int(port), user), None)
+
+    def __contains__(self, key):
+        """
+        Permet comprovar si un túnel existeix amb (ssh, port, user) in t.
+        """
+        if not isinstance(key, tuple) or len(key) != 3:
+            return False
+        ssh, port, user = key
+        return (ssh, int(port), user) in GABDSSHTunnel._servers
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            # Accés per índex com si fos una llista
+            return list(self._servers.values())[key]
+        elif isinstance(key, tuple) and len(key) == 3:
+            # Accés per clau (ssh, port, user)
+            ssh, port, user = key
+            return self._servers.get((ssh, int(port), user))
+        else:
+            raise KeyError("Ús invàlid: utilitza un int o una tupla (ssh, port, user)")
+
+    def __len__(self):
+        """Retorna el nombre de túnels actius."""
+        return len(self._servers)
+
+    def __iter__(self):
+        """Permet iterar directament sobre els túnels."""
+        return iter(self._servers.values())
+
+    @classmethod
+    def pop(cls, item):
+        """
+        Elimina un túnel de _servers.
+        :param item: SSHTunnel o clau (ssh, port, user)
+        :return: el túnel eliminat o None si no existeix
+        """
+        key = None
+
+        # Si és una instància de SSHTunnel, trobem la clau corresponent
+        if isinstance(item, SSHTunnel):
+            for k, v in cls._servers.items():
+                if v is item:
+                    key = k
+                    break
+            if key is None:
+                return None  # No trobat
+
+        # Si és una tupla, la fem servir com a clau
+        elif isinstance(item, tuple) and len(item) == 3:
+            key = (item[0], int(item[1]), item[2])
+
+        else:
+            raise ValueError("El paràmetre ha de ser SSHTunnel o clau (ssh, port, user)")
+
+        # Eliminar i decrementar el comptador
+        removed: Any | None = cls._servers.pop(key, None)
+        if removed is not None:
+            cls._num_connections -= 1
+        return removed
 
 class AbsConnection(ABC, GABDSSHTunnel):
     """

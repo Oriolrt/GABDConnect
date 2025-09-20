@@ -11,7 +11,7 @@ import threading
 import time
 import logging
 from contextlib import closing
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, Any
 import paramiko
 
 # Configure logging
@@ -184,6 +184,15 @@ class ForwardServer(threading.Thread):
             except Exception:
                 pass
 
+    def __str__(self) -> str:
+        """Representació amigable del túnel."""
+        return f"{self.local_port} <- {self.remote_host}:{self.remote_port}"
+
+    def __repr__(self) -> str:
+        """Representació tècnica del túnel."""
+        return (f"<ForwardServer local={self.local_port} "
+                f"remote={self.remote_host}:{self.remote_port}>")
+
 
 class SSHTunnel:
 
@@ -278,7 +287,7 @@ class SSHTunnel:
             if local_port not in self._forward_servers:
                 raise RuntimeError(f"No forward exists for local port {local_port}")
 
-        key_to_remove = None
+        keys_to_remove = set()
         for (host, port), count in self.local_bind_addresses.items():
             if port == local_port:
                 if count > 1:
@@ -288,11 +297,11 @@ class SSHTunnel:
                     return
                 else:
                     # Marquem per eliminar del diccionari i del servidor
-                    key_to_remove = (host, port)
-                break
+                    keys_to_remove.add((host, port) )
+
 
         # Si el comptador era 1, eliminem el servidor i el mapping
-        if key_to_remove:
+        for key_to_remove in keys_to_remove:
             server = self._forward_servers.pop(local_port)
             server.stop()
 
@@ -385,15 +394,50 @@ class SSHTunnel:
         self.stop()
 
     def is_active(self, timeout=2):
-        if not self.transport or not self.transport.is_active():
+        if not self.transport or not self.transport.active:
             return False
 
-            # Test one of the local ports
-            for local_port in self.local_bind_ports:
-                try:
-                    with closing(socket.create_connection(("localhost", local_port), timeout=timeout)):
-                        return True
-                except Exception:
-                    continue
+        # Test one of the local ports
+        for local_port in self.local_bind_ports:
+            try:
+                with closing(socket.create_connection(("localhost", local_port), timeout=timeout)):
+                    return True
+            except Exception:
+                continue
 
         return False
+
+    def __getitem__(self, index: int):
+        """
+        Accés per índex als servidors de forwards.
+        """
+        return list(self._forward_servers.values())[index]
+
+    def __len__(self):
+        """Nombre de forwards actius."""
+        return len(self._forward_servers)
+
+    def __iter__(self):
+        """Iterador sobre els servidors de forwards."""
+        return iter(self._forward_servers.values())
+
+    def pop(self, key: int) -> Optional[Any]:
+        """
+        Elimina i retorna el servidor de forward associat a un port local.
+        :param key: port local
+        :return: el servidor eliminat o None si no existeix
+        """
+        return self._forward_servers.pop(key, None)
+
+    def __str__(self) -> str:
+        """Representació amigable del túnel amb forwards."""
+        base = f"{self.ssh_username}@{self.ssh_host}:{self.ssh_port}"
+        if not self._forward_servers:
+            return f"{base} (sense forwards actius)"
+        forwards = ", ".join(str(fwd) for fwd in self._forward_servers.values())
+        return f"{base} -> [{forwards}]"
+
+    def __repr__(self) -> str:
+        """Representació tècnica per a debugging."""
+        return (f"<SSHTunnel user={self.ssh_username} host={self.ssh_host} "
+                f"port={self.ssh_port} forwards={len(self._forward_servers)}>")

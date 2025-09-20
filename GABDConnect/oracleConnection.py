@@ -18,7 +18,7 @@ from .AbsConnection import AbsConnection
 
 
 class oracleConnection(AbsConnection):
-    '''
+    """
     Classe per gestionar la connexió a una base de dades Oracle.
 
     Atributs:
@@ -29,19 +29,19 @@ class oracleConnection(AbsConnection):
         Nom del servei de la base de dades.
     _dsn : str
         Data Source Name per a la connexió a la base de dades.
-    '''
+    """
 
     __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
 
     def __init__(self, **params):
-        '''
+        """
         Constructor per inicialitzar la connexió Oracle.
 
         Paràmetres:
         -----------
         **params : dict
             Paràmetres de connexió, incloent `serviceName` i `port`.
-         '''
+        """
 
         self._cursor = None
         self._serviceName = params.pop('serviceName', 'orcl')
@@ -59,14 +59,14 @@ class oracleConnection(AbsConnection):
 
 
     def cursor(self) -> DB_TYPE_CURSOR:
-        '''
+        """
         Retorna el cursor de la connexió Oracle.
 
         Retorna:
         --------
         oracledb.Cursor
             El cursor de la connexió.
-        '''
+        """
         try:
             self._cursor = self.conn.cursor()
             self._cursor.callproc("dbms_output.enable")
@@ -110,13 +110,13 @@ class oracleConnection(AbsConnection):
 
 
     def close(self) -> None:
-        '''
+        """
         Tanca la connexió a la base de dades Oracle.
 
         Retorna:
         --------
         None
-        '''
+        """
         try:
             self.conn.close()
             self.closetunnel()
@@ -129,24 +129,24 @@ class oracleConnection(AbsConnection):
 
 
     def commit(self) -> None:
-        '''
+        """
         Fa un commit de la transacció actual.
 
         Retorna:
         --------
         None
-        '''
+        """
         self.conn.commit()
 
     def test_connection(self) -> bool:
-        '''
+        """
         Prova la connexió a la base de dades Oracle.
 
         Retorna:
         --------
         bool
             True si la connexió és correcta, False en cas contrari.
-        '''
+        """
         cur = self._cursor
 
         try:
@@ -161,29 +161,29 @@ class oracleConnection(AbsConnection):
             return False
 
     def startSession(self) -> bool:
-        '''
+        """
         Inicia una sessió amb la base de dades Oracle.
 
         Retorna:
         --------
         bool
             True si la sessió s'ha iniciat correctament, False en cas contrari.
-      '''
+        """
         self.open()
-        return self.isStarted
+        return self.is_started
 
     def showMessages(self) -> None:
-        '''
+        """
         Mostra els missatges de sortida de la base de dades Oracle.
 
         Retorna:
         --------
         None
-        '''
-        statusVar = self.cursor.var(NUMBER)
-        lineVar = self.cursor.var(STRING)
+        """
+        statusVar = self._cursor.var(NUMBER)
+        lineVar = self._cursor.var(STRING)
         while True:
-            self.cursor.callproc("dbms_output.get_line", (lineVar, statusVar))
+            self._cursor.callproc("dbms_output.get_line", (lineVar, statusVar))
             if statusVar.getvalue() != 0:
                 break
             print(lineVar.getvalue())
