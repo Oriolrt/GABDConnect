@@ -123,11 +123,11 @@ class GABDSSHTunnel:
         self._port = valor
 
     def __enter__(self):
-        self.open()
+        self.opentunnel()
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+        self.closetunnel()
 
     def opentunnel(self):
         """
