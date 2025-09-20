@@ -93,7 +93,9 @@ class oracleConnection(AbsConnection):
           :return: bool
         """
 
-        AbsConnection.open(self)
+        if not AbsConnection.open(self):
+            t = self.server
+            raise RuntimeError(f"Could not open the SSH tunnel {t}. Check the connection parameters and its status.")
 
         # Si no es passa dsn, el creem a partir de host/port/service_name o de self._dsn
         if dsn is None:
@@ -113,12 +115,15 @@ class oracleConnection(AbsConnection):
                 self.is_started = True
             else:
                 self.is_started = False
-                raise RuntimeError("Could not connect to the database. Check the connection parameters and its status.")
+                t = self.server
+                raise RuntimeError(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
+                                   f" Tunnel: {t}")
 
         except DatabaseError as e:
             #self.closeTunnel()
             self.is_started = False
-            logging.error(f"Error connecting to the database with dsn: {self._dsn}")
+            logging.error(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
+                                   f" Tunnel: {t}")
             logging.error(f"Error: {e}")
         finally:
             return self.is_started
@@ -134,13 +139,12 @@ class oracleConnection(AbsConnection):
         """
         try:
             self.conn.close()
-            self.closetunnel()
+            #self.closetunnel()
             self.is_started = False
         except DatabaseError:
             logging.warning('Database connection already closed')
         except AttributeError as e:
-            print("Error: la connexió és None, no puc obrir cursor.")
-            print("Detall:", e)
+            print(f"Connexió a {self._dsn} tancada.")
 
 
     def commit(self) -> None:
@@ -224,4 +228,12 @@ class oracleConnection(AbsConnection):
 
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Tanca la connexió Oracle quan es surt del context manager.
+        """
         self.close()
+        try:
+            self.closetunnel()
+        except AttributeError as e:
+            print("Error: Hi ha problemes en tancar el tunnel SSH.")
+            print("Detall:", e)
