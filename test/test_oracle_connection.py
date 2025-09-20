@@ -239,7 +239,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        local_port_counter = 1530
+        local_port_counter = 1430
 
         for line in file.strip().split('\n'):
             # Split the line by spaces or tabs
