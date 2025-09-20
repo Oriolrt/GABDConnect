@@ -5,9 +5,12 @@ Created on Jun 12, 2018
 @author: Oriol Ramos Terrades
 @email: oriol.ramos@uab.cat
 
-copyrigth: 2018, Oriol Ramos Terrades
+copyright: 2018, Oriol Ramos Terrades
 
-Aquest script forma part del material didàctic de l'assignatura de Gestió i Administració de Bases de Dades (GABD) de la Universitat Autònoma de Barcelona. La classe `oracleConnection` proporciona una implementació específica per a la gestió de connexions a bases de dades Oracle, incloent la configuració i manteniment de les connexions. Aquesta eina és essencial per a l'administració segura i eficient de bases de dades Oracle en entorns distribuïts.
+Aquest script forma part del material didàctic de l'assignatura de Gestió i Administració de Bases de Dades (GABD) de la
+Universitat Autònoma de Barcelona. La classe `oracleConnection` proporciona una implementació específica per a la gestió de
+connexions a bases de dades Oracle, incloent la configuració i manteniment de les connexions. Aquesta eina és essencial per
+a l'administració segura i eficient de bases de dades Oracle en entorns distribuïts.
 """
 
 import logging
@@ -82,17 +85,29 @@ class oracleConnection(AbsConnection):
             return self._cursor
 
 
-    def open(self) -> None:
+    def open(self, dsn: str = None, host: str = None, port: int = None,
+         service_name: str = None, **con_params) -> bool:
         """
           Connect to a oracle server given the connexion information saved on the cfg member variable.
 
-          :return: None
+          :return: bool
         """
 
         AbsConnection.open(self)
 
+        # Si no es passa dsn, el creem a partir de host/port/service_name o de self._dsn
+        if dsn is None:
+            if host and port and service_name:
+                dsn_to_use = makedsn(host, port, service_name=service_name)
+            else:
+                dsn_to_use = self._dsn
+        else:
+            dsn_to_use = dsn
+
+        con_params_to_use = {**self._con_params, **con_params}
+
         try:
-            self.conn = connect(self._dsn,**self._con_params)
+            self.conn = connect(dsn_to_use, **con_params_to_use)
             if self.conn is not None:
                 self._cursor = self.conn.cursor()
                 self.is_started = True
@@ -187,3 +202,26 @@ class oracleConnection(AbsConnection):
             if statusVar.getvalue() != 0:
                 break
             print(lineVar.getvalue())
+
+    def is_open(self) -> bool:
+        """
+        Retorna True si la connexió Oracle està oberta.
+        """
+        if not hasattr(self, "conn") or self.conn is None:
+            return False
+
+        try:
+            return self.conn.ping() is None  # retorna None si la connexió és vàlida
+        except Exception:
+            return False
+
+    # Context manager
+    def __enter__(self):
+        success = self.open()  # sense arguments → utilitza self._dsn
+        if not success:
+            raise RuntimeError("No s'ha pogut obrir la connexió Oracle")
+        return self.conn
+
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

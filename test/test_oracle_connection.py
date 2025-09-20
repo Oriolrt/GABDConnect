@@ -53,13 +53,11 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_sshtunnel_default_connection(self):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
-                           passwd=self.pwd, serviceName=self.serviceName) as client:
-            #client.open()
-            self.assertIsNotNone(client, f"Should be able to connect to the Oracle database in {self.hostname} \
+                           passwd=self.pwd, serviceName=self.serviceName) as conn:
+
+            self.assertTrue(conn.is_healthy(), f"Should be able to connect to the Oracle database in {conn} \
             through SSH tunnel")
 
-            #client.close()
-            #self.assertEqual(False, client.is_started, f"Database should be closed and is {client.is_started}")
 
         time.sleep(5)
 
@@ -71,12 +69,6 @@ class OracleConnectTestCase(unittest.TestCase):
         SSH_USER = self.ssh_server['user'] if self.ssh_server else None
         port = self.ssh_server['port'] if self.ssh_server else None
         id_key = self.ssh_server['id_key'] if self.ssh_server else None
-
-        # # Comprovar si existeix el fitxer local o utilitzar el fitxer creat pel workflow
-        # if os.path.isfile(f"../dev_keys/id_{SSH_USER}"):
-        #     id_key = f"../dev_keys/id_{SSH_USER}"
-        # else:
-        #     id_key = "ssh_key"  # fitxer creat pel workflow a partir del secret
 
         ssh_server = {
             'ssh': ssh_tunnel,
@@ -99,31 +91,15 @@ class OracleConnectTestCase(unittest.TestCase):
             ssh_data=ssh_server,
             serviceName=serviceName,
             multiple_tunnels=self.multiple_tunnels
-        ) as db:
+        ) as conn:
+            self.assertTrue(conn.is_healthy(), f"Should be able to connect to the Oracle database in {conn}  through SSH tunnel")
 
-            try:
-                # Obrir connexió
-                #db.open()
-                self.assertTrue(
-                    db.test_connection(),
-                    f"Should be able to connect to Oracle database in {hostname} through SSH tunnel"
-                )
-                logging.warning(f"La connexió a {hostname} funciona correctament.")
-            except Exception as e:
-                self.fail(f"Failed to connect or test Oracle database: {e}")
-            #finally:
-            #    # Tancar connexió i comprovar estat
-            #    db.close()
-            #    self.assertFalse(
-            #        db.is_started,
-            #        f"Database should be closed and isStarted is {db.is_started}"
-            #    )
 
         time.sleep(5)
 
     def test_consulta_basica_connection(self):
         print("\nTest: test_consulta_basica_connection")
-        local_port = get_unique_free_port()
+        local_port = get_unique_free_port(1521)
 
         # Crear client Oracle amb túnel SSH
         with orcl(
@@ -132,19 +108,18 @@ class OracleConnectTestCase(unittest.TestCase):
             ssh_data=self.ssh_server,
             user=self.user,
             passwd=self.pwd,
+            local_port=local_port,
             serviceName=self.serviceName
-        ) as client:
+        ) as conn:
 
-            # Obrir connexió
-            #client.open()
             self.assertTrue(
-                client.is_started,
-                f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel"
+                conn.is_healthy(),
+                f"Should be able to connect to the Oracle database in {conn} through SSH tunnel"
             )
 
             try:
                 # Executar consulta bàsica
-                with client.cursor() as curs:
+                with conn.cursor() as curs:
                     curs.execute("""
                     SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
                     UNION
@@ -154,20 +129,14 @@ class OracleConnectTestCase(unittest.TestCase):
                         print(row)
             except Exception as e:
                 self.fail(f"Failed to execute basic query: {e}")
-            #finally:
-            #    # Tancar connexió
-            #    client.close()
-            #    self.assertFalse(
-            #        client.is_started,
-            #        f"Database should be closed and isStarted is {client.is_started}"
-            #    )
+
 
         time.sleep(5)
 
     def test_dba_connection(self):
         print("\nTest DBA connection through SSH tunnel")
         # Configuració del test
-        local_port = 1525
+        local_port = get_unique_free_port(1521)
         user = 'sys'
         pwd = 'oracle'
         mode = 'sysDBA'
@@ -183,18 +152,16 @@ class OracleConnectTestCase(unittest.TestCase):
             serviceName=self.serviceName,
             mode=mode,
             local_port=local_port,
-        ) as client:
+        ) as conn:
 
-            # Obrir connexió
-            #client.open()
             self.assertTrue(
-                client.is_started,
-                f"Should be able to connect to the Oracle database in {hostname} through SSH tunnel"
+                conn.is_healthy(),
+                f"Should be able to connect to the Oracle database in {conn} through SSH tunnel"
             )
 
             try:
                 # Executar consulta per obtenir estat de la base de dades i backups
-                with client.cursor() as curs:
+                with conn.cursor() as curs:
                     curs.execute("""
                     SELECT *
                     FROM
@@ -221,13 +188,7 @@ class OracleConnectTestCase(unittest.TestCase):
                         print(row)
             except Exception as e:
                 self.fail(f"Failed to execute database query: {e}")
-            #finally:
-            #    # Tancar connexió
-            #    client.close()
-            #    self.assertFalse(
-            #        client.is_started,
-            #        f"Database should be closed and isStarted is {client.is_started}"
-            #    )
+
 
         time.sleep(5)
 
@@ -246,7 +207,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        local_port_counter = 1521
+        local_port_counter = get_unique_free_port(1521)
 
         for line in file.strip().split('\n'):
             # Split the line by spaces or tabs
@@ -255,8 +216,8 @@ class OracleConnectTestCase(unittest.TestCase):
                 group_name, PORT, ID_KEY = parts
                 # Create the tunnels dictionary for the current group
 
-                tunnels = {local_port_counter: f"oracle-1.{group_name}.gabd:1521",
-                           local_port_counter+1: (f"oracle-2.{group_name}.gabd", 1521)}
+                tunnels = {get_unique_free_port(local_port_counter): f"oracle-1.{group_name}.gabd:1521",
+                           get_unique_free_port(local_port_counter+1): (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
@@ -303,53 +264,48 @@ class OracleConnectTestCase(unittest.TestCase):
                 print(conn_info)
                 # Create the database connection object using the information in conn_info
                 d = orcl(**conn_info)
-                # Open connection
-                if not d.is_started:
-                    d.open()
                 # Append the connection object to the all_dbs list
                 all_dbs.append(d)
 
         for d in all_dbs:
             try:
-                with d.cursor() as curs:
-                    curs.execute("""select *
-                          from
-                          (SELECT i.instance_name,
-                           i.status AS instance_status,
-                           (SELECT d.open_mode FROM v$database d) AS database_open_mode,
-                           CASE 
-                             WHEN i.status = 'STARTED' THEN 'IDLE (només instància iniciada)'
-                             WHEN i.status = 'MOUNTED' THEN 'MUNTADA (BD muntada, no oberta)'
-                             WHEN i.status = 'OPEN' 
-                                  AND (SELECT d.open_mode FROM v$database d) = 'READ WRITE'
-                                  THEN 'OBERTA (lectura i escriptura)'
-                             WHEN i.status = 'OPEN' 
-                                  AND (SELECT d.open_mode FROM v$database d) LIKE 'READ ONLY%'
-                                  THEN 'OBERTA (només lectura)'
-                             ELSE 'ESTAT DESCONEGUT'
-                           END AS estat_complet
-                           FROM   v$instance i),
-                           (SELECT COUNT(*)              AS total_backups,
-                             MIN(b.completion_time) AS first_backup_date,
-                             MAX(b.completion_time) AS last_backup_date
-                            FROM   v$backup_piece p
-                             JOIN   v$backup_set b 
-                             ON p.set_stamp = b.set_stamp 
-                            AND p.set_count = b.set_count)
-                          """)
-                    for row in curs:
-                        print(row)
-            except Exception:
+                with d as conn:
+                    with conn.cursor() as curs:
+                        curs.execute("""select *
+                              from
+                              (SELECT i.instance_name,
+                               i.status AS instance_status,
+                               (SELECT d.open_mode FROM v$database d) AS database_open_mode,
+                               CASE 
+                                 WHEN i.status = 'STARTED' THEN 'IDLE (només instància iniciada)'
+                                 WHEN i.status = 'MOUNTED' THEN 'MUNTADA (BD muntada, no oberta)'
+                                 WHEN i.status = 'OPEN' 
+                                      AND (SELECT d.open_mode FROM v$database d) = 'READ WRITE'
+                                      THEN 'OBERTA (lectura i escriptura)'
+                                 WHEN i.status = 'OPEN' 
+                                      AND (SELECT d.open_mode FROM v$database d) LIKE 'READ ONLY%'
+                                      THEN 'OBERTA (només lectura)'
+                                 ELSE 'ESTAT DESCONEGUT'
+                               END AS estat_complet
+                               FROM   v$instance i),
+                               (SELECT COUNT(*)              AS total_backups,
+                                 MIN(b.completion_time) AS first_backup_date,
+                                 MAX(b.completion_time) AS last_backup_date
+                                FROM   v$backup_piece p
+                                 JOIN   v$backup_set b 
+                                 ON p.set_stamp = b.set_stamp 
+                                AND p.set_count = b.set_count)
+                              """)
+                        for row in curs:
+                            print(row)
+            except Exception as e:
+                print(f"Error during query execution: {e}")
                 pass
 
+
         for d in all_dbs:
-            try:
-                d.close()
-                self.assertEqual(False, d.is_started,
-                                 f"Database should be closed and is {d.is_started}")  # add assertion here
-                del d
-            except Exception as e:
-                print(f"Error closing connection: {e}")
+            self.assertFalse(d.is_open(), f"Database {d} should be closed.")  # add assertion here
+            del d
 
         time.sleep(5)
 

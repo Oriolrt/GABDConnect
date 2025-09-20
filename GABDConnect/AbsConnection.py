@@ -352,7 +352,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
     Aquesta classe abstracta emmagatzema informació bàsica de connexió i mètodes per connectar-se a DBMS.
     """
 
-    __slots__ = ['_conn', '_isStarted', '_user', '_pwd']
+    __slots__ = ['_conn', '_is_started', '_user', '_pwd']
 
     def __init__(self, **params):
         """
@@ -365,7 +365,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
         """
 
         self._conn = None
-        self._isStarted = False
+        self._is_started = False
         self._user = params.pop('user', None)
         self._pwd = params.pop('passwd', None)
         # self._bd = params.pop('bd', None)
@@ -381,7 +381,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
     @conn.setter
     def conn(self, valor):
         self._conn = valor
-        self._isStarted = True
+        self._is_started = True
 
     @property
     def server(self):
@@ -391,11 +391,11 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
     @property
     def is_started(self):
-        return self._isStarted
+        return self._is_started
 
     @is_started.setter
     def is_started(self, valor: bool):
-        self._isStarted = valor
+        self._is_started = valor
 
     @property
     def user(self):
@@ -446,9 +446,9 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
         super().opentunnel()  # Obre el túnel SSH
 
-        self._isStarted = True
+        self._is_started = True
 
-        return self._isStarted
+        return self._is_started
 
     @abstractmethod
     def close(self):
@@ -459,7 +459,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
         --------
         None
         """
-        self._isStarted = False
+        self._is_started = False
 
     def commit(self):
         """
