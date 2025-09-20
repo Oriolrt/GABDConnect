@@ -199,7 +199,14 @@ class SSHTunnel:
         self.ssh_pkey = ssh_pkey
 
         self.remote_bind_addresses = remote_bind_addresses or []
-        self.local_bind_addresses = local_bind_addresses or []
+        # self.local_bind_addresses = local_bind_addresses or {}  # TODO :Ha de ser un diccionari on les claus són les addreces \
+        # locals i els values el nombre de forwards actius. Aquest valor s'haurà d'incrementar i decrementar segons s'afegeixin o eliminin forwards.
+
+        # Converteix la llista en un diccionari { (host, port): 0 }
+        self.local_bind_addresses: Dict[Tuple[str, int], int] = {
+            addr: 0 for addr in (local_bind_addresses or [])
+        }
+
 
         # Ensure we have matching local/remote addresses
         while len(self.local_bind_addresses) < len(self.remote_bind_addresses):
@@ -241,13 +248,23 @@ class SSHTunnel:
                 if not (server.remote_host == remote_host and server.remote_port == remote_port):
                     raise RuntimeError(f"Port {local_port} is already forwarded")
 
-                return local_port  # Already forwarded to the same remote
+                # Incrementem comptador de forwards existents
+                self.local_bind_addresses[(local_host, local_port)] = (
+                    self.local_bind_addresses.get((local_host, local_port), 0) + 1
+                )
+                return local_port  # Ja estava endreçat al mateix remote
+
             else:
                 actual_port = self._start_forward(local_port, remote_host, remote_port)
 
                 # Guardar el mapping
                 self.remote_bind_addresses.append((remote_host, remote_port))
-                self.local_bind_addresses.append((local_host, actual_port))
+                # self.local_bind_addresses.append((local_host, actual_port))
+
+                # Inicialitzar o incrementar comptador en el diccionari
+                self.local_bind_addresses[(local_host, actual_port)] = (
+                    self.local_bind_addresses.get((local_host, actual_port), 0) + 1
+                )
 
                 logger.info(f"Added forward {local_host}:{actual_port} -> {remote_host}:{remote_port}")
                 return actual_port
@@ -261,14 +278,30 @@ class SSHTunnel:
             if local_port not in self._forward_servers:
                 raise RuntimeError(f"No forward exists for local port {local_port}")
 
-        server = self._forward_servers.pop(local_port)
-        server.stop()
-
-        for i, (host, port) in enumerate(self.local_bind_addresses):
+        key_to_remove = None
+        for (host, port), count in self.local_bind_addresses.items():
             if port == local_port:
-                self.local_bind_addresses.pop(i)
-                self.remote_bind_addresses.pop(i)
+                if count > 1:
+                    # Només decrementem
+                    self.local_bind_addresses[(host, port)] = count - 1
+                    logger.info(f"Decremented forward count for {host}:{port} -> {count - 1} active")
+                    return
+                else:
+                    # Marquem per eliminar del diccionari i del servidor
+                    key_to_remove = (host, port)
                 break
+
+        # Si el comptador era 1, eliminem el servidor i el mapping
+        if key_to_remove:
+            server = self._forward_servers.pop(local_port)
+            server.stop()
+
+            self.local_bind_addresses.pop(key_to_remove, None)
+
+            for i, (rhost, rport) in enumerate(self.remote_bind_addresses):
+                if key_to_remove[1] == local_port:
+                    self.remote_bind_addresses.pop(i)
+                    break
 
         logger.info(f"Removed forward for port {local_port}")
 

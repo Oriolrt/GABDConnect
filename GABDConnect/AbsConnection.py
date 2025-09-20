@@ -222,10 +222,12 @@ class GABDSSHTunnel:
         if self._mt is not None:
             local_ports = list(self._mt.keys())
         else:
-            local_ports = [int(self._local_port)]
+            local_ports = [int(self._local_port)]  # TODO: Això ha de ser un diccionari on els values són el nombre de connexions \
+            # que utilitzen aquest port local
 
         # Eliminar forwards d'aquest objecte
-        for lp in local_ports:
+        for lp in local_ports:  # TODO: s'ha de decrementar en un el nombre de connexions que utilitzen el local_port local i si \
+            # arriba a 0, eliminar-lo
             tunnel.remove_forward(lp)
 
         # Si no queden forwards, tanquem completament el túnel
@@ -304,13 +306,20 @@ class AbsConnection(ABC, GABDSSHTunnel):
     def pwd(self, valor: str):
         self._pwd = valor
 
+    def __enter__(self):
+        self.open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
     def __str__(self):
-        return f"Connexió a {self._hostname}:{self._port} amb l'usuari {self._user} a la base de dades \
-        {self._bd if self._bd is not None else '.'}"
+        return f"Connexió a {self._hostname}:{self._port} amb l'usuari {self._user} a la base de dades "  # \
+#        {self._bd if self._bd is not None else '.'}"
 
     def __repr__(self):
-        return f"Connexió a {self._hostname}:{self._port} amb l'usuari {self._user} a la base de dades \
-        {self._bd if self._bd is not None else '.'}"
+        return f"Connexió a {self._hostname}:{self._port} amb l'usuari {self._user} a la base de dades "  # \
+#        {self._bd if self._bd is not None else '.'}"
 
     def __getitem__(self, item):
         return self.__getattribute__(item)

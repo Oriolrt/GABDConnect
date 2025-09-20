@@ -5,6 +5,15 @@ from GABDConnect.ssh_tunnel import get_free_port
 import logging
 import os
 
+USED_PORTS = set()
+
+def get_unique_free_port(port = None):
+    port = port if port is not None else get_free_port()
+    while port in USED_PORTS:
+        port = get_free_port()
+    USED_PORTS.add(port)
+    return port
+
 
 class OracleConnectTestCase(unittest.TestCase):
     def setUp(self):
@@ -37,15 +46,15 @@ class OracleConnectTestCase(unittest.TestCase):
         self.pwd = "ESPECTACLES"
 
         self.multiple_tunnels = {
-            get_free_port(): "oracle-1.grup00.gabd:1521",
-            get_free_port(): ("oracle-2.grup00.gabd", 1521),
-            get_free_port(): ("oracle-2.grup00.gabd", 22)
+            get_unique_free_port(1521): "oracle-1.grup00.gabd:1521",
+            get_unique_free_port(1522): ("oracle-2.grup00.gabd", 1521),
+            get_unique_free_port(2222): ("oracle-2.grup00.gabd", 22)
         }
 
     def test_sshtunnel_default_connection(self):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
                            passwd=self.pwd, serviceName=self.serviceName) as client:
-            client.open()
+            #client.open()
             self.assertIsNotNone(client, f"Should be able to connect to the Oracle database in {self.hostname} \
             through SSH tunnel")
 
@@ -94,7 +103,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
             try:
                 # Obrir connexió
-                db.open()
+                #db.open()
                 self.assertTrue(
                     db.test_connection(),
                     f"Should be able to connect to Oracle database in {hostname} through SSH tunnel"
@@ -114,7 +123,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_consulta_basica_connection(self):
         print("\nTest: test_consulta_basica_connection")
-        local_port = get_free_port()
+        local_port = get_unique_free_port()
 
         # Crear client Oracle amb túnel SSH
         with orcl(
@@ -127,7 +136,7 @@ class OracleConnectTestCase(unittest.TestCase):
         ) as client:
 
             # Obrir connexió
-            client.open()
+            #client.open()
             self.assertTrue(
                 client.is_started,
                 f"Should be able to connect to the Oracle database in {self.hostname} through SSH tunnel"
@@ -172,11 +181,12 @@ class OracleConnectTestCase(unittest.TestCase):
             user=user,
             passwd=pwd,
             serviceName=self.serviceName,
-            mode=mode
+            mode=mode,
+            local_port=local_port,
         ) as client:
 
             # Obrir connexió
-            client.open()
+            #client.open()
             self.assertTrue(
                 client.is_started,
                 f"Should be able to connect to the Oracle database in {hostname} through SSH tunnel"
@@ -236,7 +246,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
         file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
-        local_port_counter = 1430
+        local_port_counter = 1521
 
         for line in file.strip().split('\n'):
             # Split the line by spaces or tabs
@@ -245,8 +255,8 @@ class OracleConnectTestCase(unittest.TestCase):
                 group_name, PORT, ID_KEY = parts
                 # Create the tunnels dictionary for the current group
 
-                tunnels = {get_free_port(): f"oracle-1.{group_name}.gabd:1521",
-                           get_free_port(): (f"oracle-2.{group_name}.gabd", 1521)}
+                tunnels = {local_port_counter: f"oracle-1.{group_name}.gabd:1521",
+                           local_port_counter+1: (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
