@@ -34,7 +34,7 @@ class oracleConnection(AbsConnection):
         Data Source Name per a la connexió a la base de dades.
     """
 
-    __slots__ = ['_cursor','_serviceName','_dsn','_con_params','_context_mode']
+    __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
 
     def __init__(self, **params):
         """
@@ -45,7 +45,7 @@ class oracleConnection(AbsConnection):
         **params : dict
             Paràmetres de connexió, incloent `serviceName` i `port`.
         """
-        self._context_mode = None  # "tunnel" o "session"
+
         self._cursor = None
         self._serviceName = params.pop('serviceName', 'orcl')
         params['port'] = params.pop('port', 1521)
@@ -126,7 +126,7 @@ class oracleConnection(AbsConnection):
                                    f" Tunnel: {self.server}")
             logging.error(f"Error: {e}")
         finally:
-            self._context_mode == "session"
+            self._context_mode = "session"
             return self
 
 
@@ -158,13 +158,18 @@ class oracleConnection(AbsConnection):
         try:
             if self._cursor is not None:
                 self._cursor.close()
+        except:
+            self._cursor = None
+
+        try:
             if self.conn is not None:
                 self.conn.close()
-            self.is_started = False
         except DatabaseError:
             logging.warning('Database connection already closed')
         except AttributeError as e:
             print(f"Connexió a {self._dsn} tancada.")
+
+        self.is_started = False
 
     def commit(self) -> None:
         """

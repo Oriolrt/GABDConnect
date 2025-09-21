@@ -51,6 +51,11 @@ class OracleConnectTestCase(unittest.TestCase):
             get_unique_free_port(2222): ("oracle-2.grup00.gabd", 22)
         }
 
+    def tearDown(self):
+        # Aquí alliberes túnels després de cada test
+        orcl.close_all_tunnels()
+        USED_PORTS.clear()
+
     def test_sshtunnel_default_connection(self):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
                            passwd=self.pwd, serviceName=self.serviceName) as db:

@@ -55,7 +55,7 @@ class GABDSSHTunnel:
     _servers = {}  # clau = (ssh, port, user), valor = sshTunnel
     _num_connections = 0
 
-    __slots__ = ['_hostname', '_port', '_ssh_data', '_local_port', '_mt']
+    __slots__ = ['_hostname', '_port', '_ssh_data', '_local_port', '_mt','_context_mode']
 
     def __init__(self, hostname, port, ssh_data=None, **kwargs):
         """
@@ -70,6 +70,8 @@ class GABDSSHTunnel:
             ssh_data : dict, opcional
                 Informació d'autenticació SSH.
         """
+
+        self._context_mode = None  # "tunnel" o "session"
         self._hostname = hostname
         if port is not None and (not isinstance(port, int) or port < 1 or port > 65535):
             raise ValueError(f"Port '{port}' no vàlid. Ha de ser un enter entre 1 i 65535")
@@ -349,6 +351,13 @@ class GABDSSHTunnel:
             cls._num_connections -= 1
         return removed
 
+    @classmethod
+    def close_all_tunnels(cls):
+        """
+        Tanca tots els túnels SSH actius.
+        """
+        cls._servers.clear()
+
 class AbsConnection(ABC, GABDSSHTunnel):
     """
     Aquesta classe abstracta emmagatzema informació bàsica de connexió i mètodes per connectar-se a DBMS.
@@ -436,6 +445,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
         self._pwd = valor
 
     def __enter__(self):
+        self._context_mode = "tunnel"
         self.open()
         return self
 
@@ -463,14 +473,15 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
         Retorna:
         --------
-        None
+        self
         """
 
         super().opentunnel()  # Obre el túnel SSH
 
         self._is_started = self.is_active()
 
-        return self._is_started
+        self._context_mode = "session"
+        return self
 
     @abstractmethod
     def close(self):
@@ -504,3 +515,5 @@ class AbsConnection(ABC, GABDSSHTunnel):
               True si la connexió és correcta, False en cas contrari.
         """
         pass
+
+

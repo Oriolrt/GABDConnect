@@ -39,6 +39,10 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
             self.local_port: ("oracle-2.grup00.gabd", 22)
         }
 
+    def tearDown(self):
+        # Aquí alliberes túnels després de cada test
+        GABDSSHTunnel.close_all_tunnels()
+
     def test_ssh_tunnel_connection(self):
         """
         Test SSH tunnel connection to localhost

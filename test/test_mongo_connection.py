@@ -41,7 +41,9 @@ class MongoConnectTestCase(unittest.TestCase):
         self.port = 27017
         self.db = "test"
 
-
+    def tearDown(self):
+        # Aquí alliberes túnels després de cada test
+        mongoConnection.close_all_tunnels()
 
     def test_mongoDB_default_connection(self):
         with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:

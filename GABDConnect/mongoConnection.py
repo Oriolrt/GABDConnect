@@ -94,6 +94,33 @@ class mongoConnection(AbsConnection):
 
         return self.conn
 
+    def close_session(self):
+        """
+        Tanca la sessió amb la base de dades MongoDB.
+
+        Retorna:
+        --------
+        None
+        """
+        try:
+            if self.conn:
+                self.conn.close()
+                print("[INFO] Sessió MongoDB tancada correctament.")
+            else:
+                print("[WARN] No hi havia connexió MongoDB activa.")
+
+            self.is_started = False
+
+        except errors.PyMongoError as e:
+            print(f"[ERROR] Error en tancar la sessió MongoDB: {e}")
+        except AttributeError:
+            print("[WARN] L'objecte MongoClient no existeix (self.conn és None).")
+
+        finally:
+            self.conn = None
+            self.bd = None
+            self.is_started = False
+
     def close(self):
         """
         Tanca la connexió a la base de dades MongoDB i el túnel SSH associat.
@@ -111,7 +138,6 @@ class mongoConnection(AbsConnection):
 
             # Tancar el forward/túnel associat
             self.closetunnel()
-            self.is_started = False
 
         except errors.PyMongoError as e:
             print(f"[ERROR] Error en tancar la connexió MongoDB: {e}")
@@ -153,4 +179,13 @@ class mongoConnection(AbsConnection):
 
         return True
 
-
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Tanca la connexió Oracle quan es surt del context manager.
+        """
+        if self._context_mode == "tunnel":
+            self.close()
+        elif self._context_mode == "session":
+            self.close_session()
+        self._context_mode = None  # netegem
+        #return False  # no suprimim excepcions
