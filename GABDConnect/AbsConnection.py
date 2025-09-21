@@ -276,7 +276,7 @@ class GABDSSHTunnel:
         key = (ssh, int(port), user)
         return cls._servers.get(key)
 
-    def is_tunnel_closed(self) -> bool:
+    def is_tunnel_close(self) -> bool:
         """Retorna si el túnel SSH està tancat."""
 
         return not self.get_tunnel().is_active()
@@ -448,7 +448,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
         super().opentunnel()  # Obre el túnel SSH
 
-        self._is_started = self.is_active()
+        self._is_started = True
 
         return self._is_started
 

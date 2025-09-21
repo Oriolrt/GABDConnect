@@ -93,9 +93,7 @@ class oracleConnection(AbsConnection):
           :return: bool
         """
 
-        if not AbsConnection.open(self):
-            t = self.server
-            raise RuntimeError(f"Could not open the SSH tunnel {t}. Check the connection parameters and its status.")
+        AbsConnection.open(self)
 
         # Si no es passa dsn, el creem a partir de host/port/service_name o de self._dsn
         if dsn is None:
@@ -115,15 +113,12 @@ class oracleConnection(AbsConnection):
                 self.is_started = True
             else:
                 self.is_started = False
-                t = self.server
-                raise RuntimeError(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
-                                   f" Tunnel: {t}")
+                raise RuntimeError("Could not connect to the database. Check the connection parameters and its status.")
 
         except DatabaseError as e:
             #self.closeTunnel()
             self.is_started = False
-            logging.error(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
-                                   f" Tunnel: {t}")
+            logging.error(f"Error connecting to the database with dsn: {self._dsn}")
             logging.error(f"Error: {e}")
         finally:
             return self.is_started
