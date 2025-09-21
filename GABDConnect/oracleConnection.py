@@ -129,7 +129,7 @@ class oracleConnection(AbsConnection):
             return self.is_started
 
 
-    def close(self,close_tunnel : bool = False ) -> None:
+    def close(self ) -> None:
         """
         Tanca la connexió a la base de dades Oracle.
 
@@ -139,14 +139,31 @@ class oracleConnection(AbsConnection):
         """
         try:
             self.conn.close()
-            if close_tunnel:
-                self.closetunnel()
             self.is_started = False
         except DatabaseError:
             logging.warning('Database connection already closed')
         except AttributeError as e:
             print(f"Connexió a {self._dsn} tancada.")
 
+    def close_session(self) -> None:
+        """
+        Tanca la sessió actual a la base de dades Oracle i manté els tunels SSH oberts.
+
+        Retorna:
+        --------
+        None
+        """
+
+        try:
+            if self._cursor is not None:
+                self._cursor.close()
+            if self.conn is not None:
+                self.conn.close()
+            self.is_started = False
+        except DatabaseError:
+            logging.warning('Database connection already closed')
+        except AttributeError as e:
+            print(f"Connexió a {self._dsn} tancada.")
 
     def commit(self) -> None:
         """

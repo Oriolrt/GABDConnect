@@ -247,13 +247,12 @@ class SSHTunnel:
             raise RuntimeError("SSH tunnel not started")
 
         if local_port == 0:
-            local_port = get_free_port(local_host)
-        #elif not is_port_available(local_port, local_host):
-        #    raise RuntimeError(f"Port {local_port} is not available on {local_host}")
+            local_port = self._check_existing_forward(remote_host, remote_port)
 
         with self._lock:
             if local_port in self._forward_servers:
                 server = self._forward_servers[local_port]
+
                 if not (server.remote_host == remote_host and server.remote_port == remote_port):
                     raise RuntimeError(f"Port {local_port} is already forwarded")
 
@@ -321,6 +320,24 @@ class SSHTunnel:
 
         self._forward_servers[local_port] = server
         return local_port
+
+    def _check_existing_forward(self, remote_host: str, remote_port: int) -> int:
+        """
+        Comprova si ja existeix un forward pel remote especificats. Si existeix, recupera el port local i en cas contrari
+        retorna un port que estigui lliure.
+
+        param remote_host: Host remot
+        param remote_port: Port remot
+
+        return: Port local associat al remote o un port lliure
+        """
+        for local_addr, remote_addr in zip(self.local_bind_addresses, self.remote_bind_addresses):
+            if remote_addr == (remote_host, remote_port):
+                return local_addr[1]
+
+        # Si no existeix, retornem un port lliure
+        return get_free_port("localhost")
+
 
     def start(self):
         """Start the SSH tunnel."""
