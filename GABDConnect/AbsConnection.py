@@ -133,13 +133,13 @@ class GABDSSHTunnel:
     def __exit__(self, exc_type, exc_value, traceback):
         self.closetunnel()
 
-    def opentunnel(self):
+    def opentunnel(self) -> bool:
         """
           Obre un túnel SSH utilitzant la informació d'autenticació proporcionada.
 
           Retorna:
           --------
-          None
+          bool
           """
 
         if self._mt is not None:
@@ -189,7 +189,7 @@ class GABDSSHTunnel:
                 print(f"[INFO] Connexió SSH oberta a {ssh_data['ssh']}:{ssh_data['port']} com {ssh_data['user']}")
             except Exception as e:
                 print(f"[ERROR] No s'ha pogut obrir el túnel: {e}")
-                return
+                return False
 
         # Afegir forwards (tant si és túnel nou com si ja existia)
         tunnel = GABDSSHTunnel._servers[key]
@@ -204,6 +204,8 @@ class GABDSSHTunnel:
             forwards = f"{self._local_port}:{self._hostname}:{self._port}"
 
         print(f"ssh -L {forwards} {ssh_data['user']}@{ssh_data['ssh']} -p {ssh_data['port']}")
+
+        return True
 
     def closetunnel(self) -> bool | None:
         """
