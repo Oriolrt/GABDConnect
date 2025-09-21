@@ -47,6 +47,10 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
                                ssh_data=self.ssh_server) as server:
             self.assertTrue(server.is_active())
 
+        print(
+            f"SSH tunnel to {self.hostname}:{self.port} via {self.ssh_server['ssh']} closed."
+        )
+
     def test_ssh_tunnel_connection_oracle_1(self):
         """
         Test SSH tunnel connection to oracle-1.grup00.gabd
@@ -57,6 +61,10 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
                                ssh_data=self.ssh_server, local_port=local_port,
                                multiple_tunnels=self.multiple_tunnels) as server:
             self.assertTrue(server.is_active())
+
+        print(
+            f"SSH tunnel to {self.hostname}:{self.port} via {self.ssh_server['ssh']} closed."
+        )
 
 
     def test_ssh_tunnel_connection_oracle_2(self):
@@ -70,6 +78,10 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
                            multiple_tunnels=self.multiple_tunnels) as server:
 
             self.assertTrue(server.is_active())
+
+        print(
+            f"SSH tunnel to {self.hostname}:{self.port} via {self.ssh_server['ssh']} closed."
+        )
 
     def test_multiple_tunnels(self):
         """

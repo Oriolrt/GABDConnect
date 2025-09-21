@@ -123,13 +123,13 @@ class oracleConnection(AbsConnection):
             #self.closeTunnel()
             self.is_started = False
             logging.error(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
-                                   f" Tunnel: {t}")
+                                   f" Tunnel: {self.server}")
             logging.error(f"Error: {e}")
         finally:
             return self.is_started
 
 
-    def close(self) -> None:
+    def close(self,close_tunnel : bool = False ) -> None:
         """
         Tanca la connexió a la base de dades Oracle.
 
@@ -139,7 +139,8 @@ class oracleConnection(AbsConnection):
         """
         try:
             self.conn.close()
-            #self.closetunnel()
+            if close_tunnel:
+                self.closetunnel()
             self.is_started = False
         except DatabaseError:
             logging.warning('Database connection already closed')
