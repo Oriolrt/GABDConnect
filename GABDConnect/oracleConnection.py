@@ -34,7 +34,7 @@ class oracleConnection(AbsConnection):
         Data Source Name per a la connexió a la base de dades.
     """
 
-    __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
+    __slots__ = ['_cursor','_serviceName','_dsn','_con_params','_context_mode']
 
     def __init__(self, **params):
         """

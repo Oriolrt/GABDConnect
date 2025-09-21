@@ -53,9 +53,9 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_sshtunnel_default_connection(self):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
-                           passwd=self.pwd, serviceName=self.serviceName) as conn:
+                           passwd=self.pwd, serviceName=self.serviceName) as db:
 
-            self.assertTrue(conn.is_healthy(), f"Should be able to connect to the Oracle database in {conn} \
+            self.assertTrue(db.is_active(), f"Should be able to connect to the Oracle database in {db} \
             through SSH tunnel")
 
 
@@ -91,8 +91,8 @@ class OracleConnectTestCase(unittest.TestCase):
             ssh_data=ssh_server,
             serviceName=serviceName,
             multiple_tunnels=self.multiple_tunnels
-        ) as conn:
-            self.assertTrue(conn.is_healthy(), f"Should be able to connect to the Oracle database in {conn}  through SSH tunnel")
+        ) as db:
+            self.assertTrue(db.is_active(), f"Should be able to connect to the Oracle database in {db}  through SSH tunnel")
 
 
         time.sleep(5)
@@ -110,16 +110,16 @@ class OracleConnectTestCase(unittest.TestCase):
             passwd=self.pwd,
             local_port=local_port,
             serviceName=self.serviceName
-        ) as conn:
+        ) as db:
 
             self.assertTrue(
-                conn.is_healthy(),
-                f"Should be able to connect to the Oracle database in {conn} through SSH tunnel"
+                db.is_active(),
+                f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
             )
 
             try:
                 # Executar consulta bàsica
-                with conn.cursor() as curs:
+                with db.cursor() as curs:
                     curs.execute("""
                     SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
                     UNION
@@ -152,16 +152,16 @@ class OracleConnectTestCase(unittest.TestCase):
             serviceName=self.serviceName,
             mode=mode,
             local_port=local_port,
-        ) as conn:
+        ) as db:
 
             self.assertTrue(
-                conn.is_healthy(),
-                f"Should be able to connect to the Oracle database in {conn} through SSH tunnel"
+                db.is_active(),
+                f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
             )
 
             try:
                 # Executar consulta per obtenir estat de la base de dades i backups
-                with conn.cursor() as curs:
+                with db.cursor() as curs:
                     curs.execute("""
                     SELECT *
                     FROM
