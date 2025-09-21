@@ -248,8 +248,8 @@ class SSHTunnel:
 
         if local_port == 0:
             local_port = get_free_port(local_host)
-        elif not is_port_available(local_port, local_host):
-            raise RuntimeError(f"Port {local_port} is not available on {local_host}")
+        #elif not is_port_available(local_port, local_host):
+        #    raise RuntimeError(f"Port {local_port} is not available on {local_host}")
 
         with self._lock:
             if local_port in self._forward_servers:
