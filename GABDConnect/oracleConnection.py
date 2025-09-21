@@ -45,7 +45,7 @@ class oracleConnection(AbsConnection):
         **params : dict
             Paràmetres de connexió, incloent `serviceName` i `port`.
         """
-
+        self._context_mode = None  # "tunnel" o "session"
         self._cursor = None
         self._serviceName = params.pop('serviceName', 'orcl')
         params['port'] = params.pop('port', 1521)
@@ -86,7 +86,7 @@ class oracleConnection(AbsConnection):
 
 
     def open(self, dsn: str = None, host: str = None, port: int = None,
-         service_name: str = None, **con_params) -> bool:
+         service_name: str = None, **con_params) :
         """
           Connect to a oracle server given the connexion information saved on the cfg member variable.
 
@@ -126,7 +126,8 @@ class oracleConnection(AbsConnection):
                                    f" Tunnel: {self.server}")
             logging.error(f"Error: {e}")
         finally:
-            return self.is_started
+            self._context_mode == "session"
+            return self
 
 
     def close(self ) -> None:
@@ -239,19 +240,21 @@ class oracleConnection(AbsConnection):
 
     # Context manager
     def __enter__(self):
+        # marquem que el context és a nivell de túnel
+        self._context_mode = "tunnel"
         success = self.open()  # sense arguments → utilitza self._dsn
         if not success:
             raise RuntimeError("No s'ha pogut obrir la connexió Oracle")
-        return self.conn
+        return self
 
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Tanca la connexió Oracle quan es surt del context manager.
         """
-        self.close()
-        try:
-            self.closetunnel()
-        except AttributeError as e:
-            print("Error: Hi ha problemes en tancar el tunnel SSH.")
-            print("Detall:", e)
+        if self._context_mode == "tunnel":
+            self.close()
+        elif self._context_mode == "session":
+            self.close_session()
+        self._context_mode = None  # netegem
+        #return False  # no suprimim excepcions
