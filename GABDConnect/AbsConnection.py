@@ -400,6 +400,26 @@ class AbsConnection(ABC, GABDSSHTunnel):
         self._is_started = valor
 
     @property
+    def isStarted(self) -> bool:
+        warnings.warn(
+            "isStarted està obsolet i s'eliminarà en futures versions. "
+            "Fes servir is_started en el seu lloc.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        return self._is_started
+
+    @isStarted.setter
+    def isStarted(self, valor: bool):
+        warnings.warn(
+            "isStarted està obsolet i s'eliminarà en futures versions. "
+            "Fes servir is_started en el seu lloc.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        self._is_started = valor
+
+    @property
     def user(self):
         return self._user
 
