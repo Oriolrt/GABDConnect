@@ -101,7 +101,7 @@ class TunnelHandler(threading.Thread):
 class ForwardServer(threading.Thread):
     """Manages a single port forward."""
 
-    def __init__(self, transport, local_port: int, remote_host: str, remote_port: int):
+    def     __init__(self, transport, local_port: int, remote_host: str, remote_port: int):
         super().__init__(daemon=True)
         self.transport = transport
         self.local_port = local_port
@@ -423,6 +423,24 @@ class SSHTunnel:
                 continue
 
         return False
+
+    def is_tunnel_closed(self, port: Optional[int] = None) -> bool:
+        """
+        Retorna si el túnel SSH està tancat.
+
+        :param port: port local del túnel a comprovar. Si és None, es comprova el túnel complet.
+        :return: True si el túnel està tancat, False si està actiu
+        """
+
+        if port is None:
+            return not self.is_active()
+
+        else:
+            fw = self._forward_servers.get(port)
+            if not fw:
+                return True
+            return not fw.is_alive()
+
 
     def __getitem__(self, index: int):
         """

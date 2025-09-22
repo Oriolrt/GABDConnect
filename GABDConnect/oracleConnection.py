@@ -8,9 +8,9 @@ Created on Jun 12, 2018
 copyright: 2018, Oriol Ramos Terrades
 
 Aquest script forma part del material didàctic de l'assignatura de Gestió i Administració de Bases de Dades (GABD) de la
-Universitat Autònoma de Barcelona. La classe `oracleConnection` proporciona una implementació específica per a la gestió de
-connexions a bases de dades Oracle, incloent la configuració i manteniment de les connexions. Aquesta eina és essencial per
-a l'administració segura i eficient de bases de dades Oracle en entorns distribuïts.
+Universitat Autònoma de Barcelona. La classe `oracleConnection` proporciona una implementació específica per a la gestió
+de connexions a bases de dades Oracle, incloent la configuració i manteniment de les connexions. Aquesta eina és
+essencial per a l'administració segura i eficient de bases de dades Oracle en entorns distribuïts.
 """
 
 import logging
@@ -34,15 +34,15 @@ class oracleConnection(AbsConnection):
         Data Source Name per a la connexió a la base de dades.
     """
 
-    __slots__ = ['_cursor','_serviceName','_dsn','_con_params']
+    __slots__ = ['_cursor', '_serviceName', '_dsn', '_con_params']
 
     def __init__(self, **params):
         """
         Constructor per inicialitzar la connexió Oracle.
 
         Paràmetres:
-        -----------
-        **params : dict
+        ---------
+        **params: dict
             Paràmetres de connexió, incloent `serviceName` i `port`.
         """
 
@@ -50,16 +50,14 @@ class oracleConnection(AbsConnection):
         self._serviceName = params.pop('serviceName', 'orcl')
         params['port'] = params.pop('port', 1521)
 
-
-        AbsConnection.__init__(self,**params)
+        AbsConnection.__init__(self, **params)
         self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
 
-        #mode = params.pop('mode', None)
+        # mode = params.pop('mode', None)
 
         mode = SYSDBA if params.pop('mode', '').strip().lower() in ['sysdba', 'dba'] else None
 
         self._con_params = {'mode': mode} if mode is not None else dict()
-
 
     def cursor(self) -> DB_TYPE_CURSOR:
         """
@@ -84,9 +82,7 @@ class oracleConnection(AbsConnection):
         finally:
             return self._cursor
 
-
-    def open(self, dsn: str = None, host: str = None, port: int = None,
-         service_name: str = None, **con_params) :
+    def open(self, dsn: str = None, host: str = None, port: int = None, service_name: str = None, **con_params):
         """
           Connect to a oracle server given the connexion information saved on the cfg member variable.
 
@@ -116,21 +112,21 @@ class oracleConnection(AbsConnection):
             else:
                 self.is_started = False
                 t = self.server
-                raise RuntimeError(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
-                                   f" Tunnel: {t}")
+                raise RuntimeError(f"Could not open the connection with dsn: {self._dsn}. Check the connection " + \
+                                   f"parameters and its status. Tunnel: {t}")
 
         except DatabaseError as e:
             #self.closeTunnel()
             self.is_started = False
-            logging.error(f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +\
-                                   f" Tunnel: {self.server}")
+            logging.error(
+                f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." + \
+                f" Tunnel: {self.server}")
             logging.error(f"Error: {e}")
         finally:
             self._context_mode = "session"
             return self
 
-
-    def close(self ) -> None:
+    def close(self) -> None:
         """
         Tanca la connexió a la base de dades Oracle.
 
@@ -245,13 +241,13 @@ class oracleConnection(AbsConnection):
 
     # Context manager
     def __enter__(self):
-        # marquem que el context és a nivell de túnel
-        self._context_mode = "tunnel"
+
         success = self.open()  # sense arguments → utilitza self._dsn
         if not success:
             raise RuntimeError("No s'ha pogut obrir la connexió Oracle")
+        # marquem que el context és a nivell de túnel
+        self._context_mode = "tunnel"
         return self
-
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """

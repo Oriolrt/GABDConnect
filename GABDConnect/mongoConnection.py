@@ -81,6 +81,9 @@ class mongoConnection(AbsConnection):
         AbsConnection.open(self)
 
         try:
+            if self.is_started:
+                # Tanquem la connexió anterior si ja estava oberta
+                self.close_session()
             self.conn = MongoClient(self._mongo_uri, serverSelectionTimeoutMS=100)
             self.conn.server_info()  # force connection on a request as the  # connect=True parameter of MongoClient seems  # to be useless here
             self.is_started = True
@@ -131,7 +134,7 @@ class mongoConnection(AbsConnection):
         """
         try:
             if self.conn:
-                self.conn.close()
+                self.close_session()
                 print("[INFO] Connexió MongoDB tancada correctament.")
             else:
                 print("[WARN] No hi havia connexió MongoDB activa.")
@@ -179,13 +182,4 @@ class mongoConnection(AbsConnection):
 
         return True
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """
-        Tanca la connexió Oracle quan es surt del context manager.
-        """
-        if self._context_mode == "tunnel":
-            self.close()
-        elif self._context_mode == "session":
-            self.close_session()
-        self._context_mode = None  # netegem
-        #return False  # no suprimim excepcions
+
