@@ -14,6 +14,10 @@ from pymongo import MongoClient, errors
 from pymongo.errors import ServerSelectionTimeoutError
 
 from .AbsConnection import AbsConnection
+import logging
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class mongoConnection(AbsConnection):
@@ -81,19 +85,26 @@ class mongoConnection(AbsConnection):
         AbsConnection.open(self)
 
         try:
-            if self.is_started:
+            if self.conn:
                 # Tanquem la connexió anterior si ja estava oberta
                 self.close_session()
             self.conn = MongoClient(self._mongo_uri, serverSelectionTimeoutMS=100)
             self.conn.server_info()  # force connection on a request as the  # connect=True parameter of MongoClient seems  # to be useless here
             self.is_started = True
             self.bd = self.conn[self.bd_name]
-            print("Connexió a MongoDB oberta.")
+            logger.debug("Connexió a MongoDB oberta.")
         except ServerSelectionTimeoutError as err:
             self.closetunnel()
             self.is_started = False
+            self.conn = None
+            logger.error(f"[ERROR] No s'ha pogut connectar a MongoDB: {err}")
             # do whatever you need
-            print(err)
+        except errors.PyMongoError as e:
+            self.closetunnel()
+            self.is_started = False
+            self.conn = None
+            raise RuntimeError(f"[ERROR] Error en establir la connexió MongoDB: {e}")
+
 
         return self.conn
 
@@ -108,21 +119,21 @@ class mongoConnection(AbsConnection):
         try:
             if self.conn:
                 self.conn.close()
-                print("[INFO] Sessió MongoDB tancada correctament.")
+                logger.info("[INFO] Sessió MongoDB tancada correctament.")
             else:
-                print("[WARN] No hi havia connexió MongoDB activa.")
+                logger.warning("[WARN] No hi havia connexió MongoDB activa.")
 
-            self.is_started = False
+            #self.is_started = False
 
         except errors.PyMongoError as e:
-            print(f"[ERROR] Error en tancar la sessió MongoDB: {e}")
+            logger.error(f"[ERROR] Error en tancar la sessió MongoDB: {e}")
         except AttributeError:
-            print("[WARN] L'objecte MongoClient no existeix (self.conn és None).")
+            logger.error("[WARN] L'objecte MongoClient no existeix (self.conn és None).")
 
         finally:
             self.conn = None
             self.bd = None
-            self.is_started = False
+            # self.is_started = False
 
     def close(self):
         """

@@ -175,6 +175,8 @@ class MongoConnectTestCase(unittest.TestCase):
         except OperationFailure:
             # Si Mongo no té auth activada → reintent sense credencials
             print("[WARN] Autenticació fallida o no activada...")
+        except Exception as e:
+            self.fail(f"Unexpected exception occurred: {e}")
 
 
 if __name__ == '__main__':
