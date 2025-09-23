@@ -6,6 +6,7 @@ from pymongo.errors import OperationFailure
 
 USED_PORTS = {int(1521)}
 
+
 def get_unique_free_port():
     port = get_free_port()
     while port in USED_PORTS:
@@ -41,38 +42,44 @@ class MongoConnectTestCase(unittest.TestCase):
         self.port = 27017
         self.db = "test"
 
-
+    def tearDown(self):
+        # Aquí alliberes túnels després de cada test
+        mongoConnection.close_all_tunnels()
 
     def test_mongoDB_default_connection(self):
-        self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
+        with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:
+            self.assertTrue(client.test_connection(), "La connexió ha fallat")
+            self.assertIsNotNone(client.conn, "MongoDB client should be initialized")
+            # Comprovem que la connexió es tanca correctament
+            tunnel = client.get_tunnel()
 
-        self.client.open()
-        self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
-        self.assertIsNotNone(self.client.conn, "MongoDB client should be initialized")
-        self.client.close()
         # Comprovem que la connexió es tanca correctament
-        self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+        self.assertTrue(tunnel.is_tunnel_closed(), "MongoDB client should be closed")
 
     def test_mongoDB_local_port_connection(self):
         self.local_port = get_unique_free_port()
-        self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db, local_port=self.local_port)
-        self.client.open()
-        self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
-        self.assertIsNotNone(self.client.conn, "MongoDB client should be initialized")
-        self.client.close()
+        with  mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db,
+                              local_port=self.local_port) as client:
+            self.assertTrue(client.test_connection(), "La connexió ha fallat")
+            self.assertIsNotNone(client.conn, "MongoDB client should be initialized")
+            # Comprovem que la connexió es tanca correctament
+            tunnel = client.get_tunnel()
+
         # Comprovem que la connexió es tanca correctament
-        self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+        self.assertTrue(tunnel.is_tunnel_closed(), "MongoDB client should be closed")
 
     def test_mongoDB_tunnel_local_connection(self):
         self.hostname = "main.grup00.gabd"
-        self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
-        self.client.open()
-        self.assertTrue(self.client.testConnection(), "La connexió ha fallat")
-        db = self.client.conn[self.client.bd_name]
-        self.assertIsNotNone(db, f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
-        self.client.close()
+        with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:
+            self.assertTrue(client.test_connection(), "La connexió ha fallat")
+            db = client.conn[client.bd_name]
+            self.assertIsNotNone(db,
+                                 f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
+            # Comprovem que la connexió es tanca correctament
+            tunnel = client.get_tunnel()
+
         # Comprovem que la connexió es tanca correctament
-        self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+        self.assertTrue(tunnel.is_tunnel_closed(), "MongoDB client should be closed")
 
     def test_mongoDB_crud_basic(self):
         bd_name = "test_mongo"
@@ -82,59 +89,61 @@ class MongoConnectTestCase(unittest.TestCase):
                 {"name": "Pere", "surname": "Roca"},
                 {"name": "Anna", "surname": "Roca"}]
 
-        self.client = mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db, local_port=local_port)
+        with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server,
+                             db=self.db, local_port=local_port) as client:
 
-        self.client.open()
-        db = self.client.conn[bd_name]
-        # creeem una col·lecció si no existeix
-        try:
-            col = db[col_name]
-        except:
-            col = db.create_collection(col_name)
+            db = client.conn[bd_name]
+            # creeem una col·lecció si no existeix
+            try:
+                col = db[col_name]
+            except:
+                col = db.create_collection(col_name)
 
-        # Insertem dades a la col·lecció
-        col.insert_many(data)
+            # Insertem dades a la col·lecció
+            col.insert_many(data)
 
-        try:
-            # Check if the data is inserted
-            self.assertEqual(
-                3,
-                col.count_documents({}),
-                f"Should be able to insert data in the MongoDB database in {self.hostname} through SSH tunnel"
-            )
-        except AssertionError as e:
-            # Cleanup si el test falla
+            try:
+                # Check if the data is inserted
+                self.assertEqual(
+                    3,
+                    col.count_documents({}),
+                    f"Should be able to insert data in the MongoDB database in {self.hostname} through SSH tunnel"
+                )
+            except AssertionError as e:
+                # Cleanup si el test falla
+                db.drop_collection(col_name)
+                raise e  # torna a llençar l'error perquè el test marqui com a fallit
+
+            # Fem una cerca ala col·lecció
+            for doc in col.find():
+                print(doc)
+
+            # Eliminem un document de la col·lecció
+            col.delete_one({"name": "Anna"})
+
+            # Eliminem la col·lecció
             db.drop_collection(col_name)
-            self.client.close()
-            raise e  # torna a llençar l'error perquè el test marqui com a fallit
 
-        # Fem una cerca ala col·lecció
-        for doc in col.find():
-            print(doc)
+            tunnel = client.get_tunnel()
 
-        # Eliminem un document de la col·lecció
-        col.delete_one({"name": "Anna"})
-
-        # Eliminem la col·lecció
-        db.drop_collection(col_name)
-
-        self.client.close()
         # Comprovem que la connexió es tanca correctament
-        self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+        self.assertTrue(tunnel.is_tunnel_closed(local_port), "MongoDB client should be closed")
 
     def test_user_data_connection_without_authentication(self):
         self.hostname = "mongo-1.grup00.gabd"
         self.local_port = get_unique_free_port()
         self.user = ""
         self.pwd = ""
-        self.client = mongoConnection(user=self.user, pwd=self.pwd  ,hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db)
-        self.client.open()
-        db = self.client.conn[self.client.bd_name]
-        self.assertIsNotNone(db,
-                             f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
-        self.client.close()
+        with mongoConnection(user=self.user, pwd=self.pwd, hostname=self.hostname, port=self.port,
+                             ssh_data=self.ssh_server,
+                             db=self.db) as client:
+            db = client.conn[client.bd_name]
+            self.assertIsNotNone(db,
+                                 f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
+            tunnel = client.get_tunnel()
+
         # Comprovem que la connexió es tanca correctament
-        self.assertIsNone(self.client.conn, "MongoDB client should be closed")
+        self.assertTrue(tunnel.is_tunnel_closed(self.local_port), "MongoDB client should be closed")
 
     def test_user_data_connection_with_authentication(self):
         self.hostname = "main.grup00.gabd"
@@ -145,38 +154,29 @@ class MongoConnectTestCase(unittest.TestCase):
 
         try:
             # Intentem amb autenticació
-            self.client = mongoConnection(
+            with mongoConnection(
                 user=self.user,
                 pwd=self.pwd,
                 hostname=self.hostname,
                 port=self.port,
                 ssh_data=self.ssh_server,
                 db=self.bd
-            )
-            self.client.open()
+            ) as client:
+                db = client.conn[client.bd_name]
+                col = db["geonames"]
+                for doc in col.find().limit(10):
+                    print(doc)
 
-            db = self.client.conn[self.client.bd_name]
-            self.assertIsNotNone(db,
-                                 f"Should be able to connect to the MongoDB database in {self.hostname} through SSH tunnel")
-            # recuperem els 10 primer elements de la col·lecció geonames
-            col = db["geonames"]
-            for doc in col.find().limit(10):
-                print(doc)
+                tunnel = client.get_tunnel()
 
-
+            # Comprovem que la connexió es tanca correctament
+            self.assertTrue(tunnel.is_tunnel_closed(self.local_port), "MongoDB client should be closed")
 
         except OperationFailure:
             # Si Mongo no té auth activada → reintent sense credencials
             print("[WARN] Autenticació fallida o no activada...")
-
-        finally:
-            self.client.close()
-            # veriquem que hem tancat la connexió
-            self.assertIsNone(self.client.conn, "MongoDB client should be closed")
-
-
-
-
+        except Exception as e:
+            self.fail(f"Unexpected exception occurred: {e}")
 
 
 

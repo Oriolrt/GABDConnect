@@ -9,198 +9,399 @@ import select
 import socket
 import threading
 import time
-
+import logging
+from contextlib import closing
+from typing import Tuple, List, Optional, Dict, Any
 import paramiko
 
-def get_free_port():
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def is_port_available(port, host="localhost") -> bool:
+    """Check if a port is available for binding."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+            return True
+    except OSError:
+        return False
+
+
+def get_free_port(host: str = "localhost") -> int:
+    """Retorna un port lliure que no s'hagi utilitzat abans."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("", 0))   # el 0 fa que el sistema triï un port lliure
+        s.bind((host, 0))
         return s.getsockname()[1]
 
-class sshTunnel:
-    def __init__(self, ssh_address_or_host, ssh_port=22, ssh_username=None, ssh_password=None, ssh_pkey=None,
-                 remote_bind_addresses=None, local_bind_addresses=None):
-        self.ssh_host, self.ssh_port = ssh_address_or_host if isinstance(ssh_address_or_host, tuple) else (ssh_address_or_host, ssh_port)
+
+class TunnelHandler(threading.Thread):
+    """Handles data forwarding between local socket and SSH channel."""
+
+    def __init__(self, channel, local_socket):
+        super().__init__(daemon=True)
+        self.channel = channel
+        self.local_socket = local_socket
+        self._running = True
+
+    def stop(self):
+        self._running = False
+
+    def run(self):
+        try:
+            while self._running:
+                # Use select with timeout to allow clean shutdown
+                ready, _, _ = select.select([self.local_socket, self.channel], [], [], 0.5)
+
+                if not ready:
+                    continue
+
+                if self.local_socket in ready:
+                    try:
+                        data = self.local_socket.recv(4096)  # Increased buffer size
+                        if not data:
+                            break
+                        if not self.channel.closed:
+                            self.channel.send(data)
+                    except (OSError, socket.error) as e:
+                        logger.debug(f"Local socket error: {e}")
+                        break
+
+                if self.channel in ready:
+                    try:
+                        data = self.channel.recv(4096)  # Increased buffer size
+                        if not data:
+                            break
+                        self.local_socket.send(data)
+                    except (OSError, socket.error) as e:
+                        logger.debug(f"Channel error: {e}")
+                        break
+
+        except Exception as e:
+            logger.error(f"Handler error: {e}")
+        finally:
+            self._cleanup()
+
+    def _cleanup(self):
+        """Clean up resources."""
+        try:
+            if not self.channel.closed:
+                self.channel.close()
+        except Exception as e:
+            logger.debug(f"Error closing channel: {e}")
+
+        try:
+            self.local_socket.close()
+        except Exception as e:
+            logger.debug(f"Error closing socket: {e}")
+
+
+class ForwardServer(threading.Thread):
+    """Manages a single port forward."""
+
+    def     __init__(self, transport, local_port: int, remote_host: str, remote_port: int):
+        super().__init__(daemon=True)
+        self.transport = transport
+        self.local_port = local_port
+        self.remote_host = remote_host
+        self.remote_port = remote_port
+        self._running = True
+        self._handlers: List[TunnelHandler] = []
+        self.server_socket = None
+
+    def stop(self):
+        """Stop the forward server and all handlers."""
+        self._running = False
+
+        # Stop all handlers
+        for handler in self._handlers[:]:  # Copy list to avoid modification during iteration
+            handler.stop()
+
+        # Close server socket
+        if self.server_socket:
+            try:
+                self.server_socket.close()
+            except Exception as e:
+                logger.debug(f"Error closing server socket: {e}")
+
+    def run(self):
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.server_socket.settimeout(1.0)  # Set timeout for accept()
+            self.server_socket.bind(("localhost", self.local_port))
+            self.server_socket.listen(10)
+
+            logger.info(f"Forward server listening on localhost:{self.local_port}")
+
+            while self._running:
+                try:
+                    client_socket, addr = self.server_socket.accept()
+                    if not self._running:
+                        client_socket.close()
+                        break
+
+                    try:
+                        channel = self.transport.open_channel(
+                            "direct-tcpip",
+                            (self.remote_host, self.remote_port),
+                            addr
+                        )
+
+                        handler = TunnelHandler(channel, client_socket)
+                        self._handlers.append(handler)
+                        handler.start()
+
+                        # Clean up finished handlers
+                        self._handlers = [h for h in self._handlers if h.is_alive()]
+
+                    except Exception as e:
+                        logger.error(f"Error creating channel: {e}")
+                        client_socket.close()
+
+                except socket.timeout:
+                    continue
+                except OSError:
+                    if self._running:
+                        logger.error(f"Server socket error on port {self.local_port}")
+                    break
+
+        except Exception as e:
+            logger.error(f"Forward server error: {e}")
+        finally:
+            self._cleanup()
+
+    def _cleanup(self):
+        """Clean up all resources."""
+        for handler in self._handlers:
+            handler.stop()
+
+        if self.server_socket:
+            try:
+                self.server_socket.close()
+            except Exception:
+                pass
+
+    def __str__(self) -> str:
+        """Representació amigable del túnel."""
+        return f"{self.local_port} <- {self.remote_host}:{self.remote_port}"
+
+    def __repr__(self) -> str:
+        """Representació tècnica del túnel."""
+        return (f"<ForwardServer local={self.local_port} "
+                f"remote={self.remote_host}:{self.remote_port}>")
+
+
+class SSHTunnel:
+
+    def __init__(self, ssh_host: str, ssh_port: int = 22, ssh_username: Optional[str] = None,
+                 ssh_password: Optional[str] = None, ssh_pkey: Optional[str] = None,
+                 remote_bind_addresses: Optional[List[Tuple[str, int]]] = None,
+                 local_bind_addresses: Optional[List[Tuple[str, int]]] = None):
+
+        self.ssh_host = ssh_host
+        self.ssh_port = ssh_port
         self.ssh_username = ssh_username
         self.ssh_password = ssh_password
         self.ssh_pkey = ssh_pkey
+
         self.remote_bind_addresses = remote_bind_addresses or []
-        self.local_bind_addresses = local_bind_addresses or [("localhost", 0)] * len(self.remote_bind_addresses)
-        self.client = self.transport = None
-        self._sockets = []
+        # self.local_bind_addresses = local_bind_addresses or {}  # TODO :Ha de ser un diccionari on les claus són les addreces \
+        # locals i els values el nombre de forwards actius. Aquest valor s'haurà d'incrementar i decrementar segons s'afegeixin o eliminin forwards.
+
+        # Converteix la llista en un diccionari { (host, port): 0 }
+        self.local_bind_addresses: Dict[Tuple[str, int], int] = {
+            addr: 0 for addr in (local_bind_addresses or [])
+        }
+
+
+        # Ensure we have matching local/remote addresses
+        while len(self.local_bind_addresses) < len(self.remote_bind_addresses):
+            self.local_bind_addresses.append(("localhost", 0))
+
+        self.client: Optional[paramiko.SSHClient] = None
+        self.transport: Optional[paramiko.SSHClient] = None
+        self._forward_servers: Dict[int, ForwardServer] = {}
+        self._lock = threading.RLock()
 
     @property
-    def local_bind_ports(self):
-        return [sock.getsockname()[1] for sock in self._sockets]
+    def local_bind_ports(self) -> List[int]:
+        with self._lock:
+            return list(self._forward_servers.keys())
 
     @property
     def local_bind_port(self):
         return self.local_bind_ports[0] if self.local_bind_ports else None
 
-    def forward_tunnel(self, local_port, remote_host, remote_port):
-        """Create a local tunnel to Oracle via SSH."""
+    def add_forward(self, remote_host: str, remote_port: int,
+                    local_host: str = "localhost", local_port: int = 0) -> int:
+        """
+        Afegeix un nou forward al túnel SSH existent.
+        remote: (remote_host, remote_port)
+        local: (local_host, local_port)
+        """
 
-        self._running = True  # Flag per controlar el bucle accept
+        if not self.transport:
+            raise RuntimeError("SSH tunnel not started")
 
-        def is_port_available(port, host="localhost"):
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                try:
-                    s.bind((host, port))
-                    return True
-                except OSError:
-                    return False
+        if local_port == 0:
+            local_port = self._check_existing_forward(remote_host, remote_port)
 
-        if not is_port_available(local_port):
-            raise RuntimeError(f"El port {local_port} ja està en ús. Tria un altre port o espera uns segons.")
+        with self._lock:
+            if local_port in self._forward_servers:
+                server = self._forward_servers[local_port]
 
-        class Handler(threading.Thread):
-            def __init__(self, chan, sock):
-                super().__init__()
-                self.chan = chan
-                self.sock = sock
+                if not (server.remote_host == remote_host and server.remote_port == remote_port):
+                    raise RuntimeError(f"Port {local_port} is already forwarded")
 
-            def run(self):
-                try:
-                    while True:
-                        r, _, _ = select.select([self.sock, self.chan], [], [])
-                        if self.sock in r:
-                            try:
-                                data = self.sock.recv(1024)
-                                if not data:
-                                    break
-                                if not self.chan.closed:
-                                    self.chan.send(data)
-                            except (OSError, socket.error):
-                                break
-                            except:
-                                pass
+                # Incrementem comptador de forwards existents
+                self.local_bind_addresses[(local_host, local_port)] = (
+                    self.local_bind_addresses.get((local_host, local_port), 0) + 1
+                )
+                return local_port  # Ja estava endreçat al mateix remote
+
+            else:
+                actual_port = self._start_forward(local_port, remote_host, remote_port)
+
+                # Guardar el mapping
+                self.remote_bind_addresses.append((remote_host, remote_port))
+                # self.local_bind_addresses.append((local_host, actual_port))
+
+                # Inicialitzar o incrementar comptador en el diccionari
+                self.local_bind_addresses[(local_host, actual_port)] = (
+                    self.local_bind_addresses.get((local_host, actual_port), 0) + 1
+                )
+
+                logger.info(f"Added forward {local_host}:{actual_port} -> {remote_host}:{remote_port}")
+                return actual_port
+
+    def remove_forward(self, local_port: int):
+        """
+        Elimina el forward associat a un port local concret.
+        """
+
+        with self._lock:
+            if local_port not in self._forward_servers:
+                raise RuntimeError(f"No forward exists for local port {local_port}")
+
+        keys_to_remove = set()
+        for (host, port), count in self.local_bind_addresses.items():
+            if port == local_port:
+                if count > 1:
+                    # Només decrementem
+                    self.local_bind_addresses[(host, port)] = count - 1
+                    logger.info(f"Decremented forward count for {host}:{port} -> {count - 1} active")
+                    return
+                else:
+                    # Marquem per eliminar del diccionari i del servidor
+                    keys_to_remove.add((host, port) )
 
 
-                        if self.chan in r:
-                            try:
-                                data = self.chan.recv(1024)
-                                if not data:
-                                    break
-                                if self.sock:
-                                    self.sock.send(data)
-                            except (OSError, socket.error):
-                                break
-                finally:
-                    try:
-                        self.chan.close()
-                    except Exception:
-                        pass
-                    try:
-                        self.sock.close()
-                    except Exception:
-                        pass
+        # Si el comptador era 1, eliminem el servidor i el mapping
+        for key_to_remove in keys_to_remove:
+            server = self._forward_servers.pop(local_port)
+            server.stop()
 
-        def accept(sock):
-            while self._running:
-                try:
-                    client, _ = sock.accept()
-                    chan = self.transport.open_channel("direct-tcpip", (remote_host, remote_port), client.getpeername())
-                    Handler(chan, client).start()
-                except OSError:
+            self.local_bind_addresses.pop(key_to_remove, None)
+
+            for i, (rhost, rport) in enumerate(self.remote_bind_addresses):
+                if key_to_remove[1] == local_port:
+                    self.remote_bind_addresses.pop(i)
                     break
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.bind(("localhost", local_port))
-        sock.listen(100)
-        threading.Thread(target=accept, args=(sock,), daemon=True).start()
-        self._sockets.append(sock)
+        logger.info(f"Removed forward for port {local_port}")
 
+    def _start_forward(self, local_port: int, remote_host: str, remote_port: int) -> int:
+        """Start a single forward server."""
+        server = ForwardServer(self.transport, local_port, remote_host, remote_port)
+        server.start()
 
-    def add_forward(self, remote, local=("localhost", 0)):
-      """
-      Afegeix un nou forward al túnel SSH existent.
-      remote: (remote_host, remote_port)
-      local: (local_host, local_port)
-      """
-      remote_host, remote_port = remote
-      local_host, local_port = local
+        self._forward_servers[local_port] = server
+        return local_port
 
-      # Verificar si ja tenim aquest mapping
-      if (remote_host, remote_port) in self.remote_bind_addresses and (
-      local_host, local_port) in self.local_bind_addresses:
-        print(f"[WARN] Forward {local_host}:{local_port} -> {remote_host}:{remote_port} ja existeix.")
-        return
+    def _check_existing_forward(self, remote_host: str, remote_port: int) -> int:
+        """
+        Comprova si ja existeix un forward pel remote especificats. Si existeix, recupera el port local i en cas contrari
+        retorna un port que estigui lliure.
 
-      try:
-        # Crear el forward
-        self.forward_tunnel(local_port, remote_host, remote_port)
+        param remote_host: Host remot
+        param remote_port: Port remot
 
-        # Guardar el mapping
-        self.remote_bind_addresses.append((remote_host, remote_port))
-        self.local_bind_addresses.append((local_host, local_port))
+        return: Port local associat al remote o un port lliure
+        """
+        for local_addr, remote_addr in zip(self.local_bind_addresses, self.remote_bind_addresses):
+            if remote_addr == (remote_host, remote_port):
+                return local_addr[1]
 
-        print(f"[INFO] Afegit forward {local_host}:{local_port} -> {remote_host}:{remote_port}")
-      except Exception as e:
-        print(f"[ERROR] No s'ha pogut afegir el forward {local_host}:{local_port} -> {remote_host}:{remote_port}: {e}")
-
-    def remove_forward(self, local_port):
-      """
-      Elimina el forward associat a un port local concret.
-      """
-      sock_to_remove = None
-      idx_to_remove = None
-
-      # Buscar quin forward correspon al local_port
-      for idx, (local_host, lp) in enumerate(self.local_bind_addresses):
-        if lp == local_port:
-          idx_to_remove = idx
-          break
-
-      if idx_to_remove is None:
-        print(f"[WARN] No s'ha trobat cap forward per al port local {local_port}")
-        return
-
-      # Tancar el socket associat
-      try:
-        sock_to_remove = self._sockets[idx_to_remove]
-        sock_to_remove.close()
-        print(f"[INFO] Forward al port local {local_port} eliminat correctament.")
-      except Exception as e:
-        print(f"[ERROR] No s'ha pogut eliminar el forward al port {local_port}: {e}")
-
-      # Eliminar de les llistes
-      try:
-        self._sockets.pop(idx_to_remove)
-        self.local_bind_addresses.pop(idx_to_remove)
-        self.remote_bind_addresses.pop(idx_to_remove)
-      except Exception:
-        pass
-
+        # Si no existeix, retornem un port lliure
+        return get_free_port("localhost")
 
 
     def start(self):
-        self.client = paramiko.SSHClient()
-        self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.client.connect(self.ssh_host, port=self.ssh_port, username=self.ssh_username,
-                            password=self.ssh_password, key_filename=self.ssh_pkey)
-        self.transport = self.client.get_transport()
+        """Start the SSH tunnel."""
+        if self.client:
+            logger.warning("Tunnel already started")
+            return
 
-        for local_bind, remote_bind in zip(self.local_bind_addresses, self.remote_bind_addresses):
-            self.forward_tunnel(local_bind[1], remote_bind[0], remote_bind[1])
+        try:
+            self.client = paramiko.SSHClient()
+            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.client.connect(
+                self.ssh_host,
+                port=self.ssh_port,
+                username=self.ssh_username,
+                password=self.ssh_password,
+                key_filename=self.ssh_pkey,
+                timeout=10)
+
+            self.transport = self.client.get_transport()
+            logger.info(f"Connected to SSH server {self.ssh_host}:{self.ssh_port}")
+
+            for local_addr, remote_addr in zip(self.local_bind_addresses, self.remote_bind_addresses):
+                local_host, local_port = local_addr
+                remote_host, remote_port = remote_addr
+
+                # Get actual port if 0 was specified
+                if local_port == 0:
+                    local_port = get_free_port(local_host)
+
+                self._start_forward(local_port, remote_host, remote_port)
+
+        except Exception as e:
+            logger.error(f"Failed to start SSH tunnel: {e}")
+            self.stop()
+            raise
 
     def stop(self):
-        self._running = False  # Atura el bucle accept
-        for sock in self._sockets:
-            sock.close()
-        self._sockets.clear()
+        """Stop the SSH tunnel and clean up resources."""
+        logger.info("Stopping SSH tunnel...")
+
+        with self._lock:
+            for server in list(self._forward_servers.values()):
+                server.stop()
+
+            self._forward_servers.clear()
 
         if self.transport:
-            self.transport.close()
-            self.transport = None
+            try:
+                self.transport.close()
+            except Exception as e:
+                logger.debug(f"Error closing transport: {e}")
+            finally:
+                self.transport = None
 
         if self.client:
-            self.client.close()
-            self.client = None
+            try:
+                self.client.close()
+            except Exception as e:
+                logger.debug(f"Error closing client: {e}")
+            finally:
+                self.client = None
 
         gc.collect()
-        time.sleep(2)
+        logger.info("SSH tunnel stopped")
 
     def __enter__(self):
         self.start()
@@ -210,14 +411,68 @@ class sshTunnel:
         self.stop()
 
     def is_active(self, timeout=2):
-        if not self.transport or not self.transport.is_active():
+        if not self.transport or not self.transport.active:
             return False
 
-        for sock in self._sockets:
+        # Test one of the local ports
+        for local_port in self.local_bind_ports:
             try:
-                test = socket.create_connection(sock.getsockname(), timeout=timeout)
-                test.close()
-                return True
+                with closing(socket.create_connection(("localhost", local_port), timeout=timeout)):
+                    return True
             except Exception:
                 continue
+
         return False
+
+    def is_tunnel_closed(self, port: Optional[int] = None) -> bool:
+        """
+        Retorna si el túnel SSH està tancat.
+
+        :param port: port local del túnel a comprovar. Si és None, es comprova el túnel complet.
+        :return: True si el túnel està tancat, False si està actiu
+        """
+
+        if port is None:
+            return not self.is_active()
+
+        else:
+            fw = self._forward_servers.get(port)
+            if not fw:
+                return True
+            return not fw.is_alive()
+
+
+    def __getitem__(self, index: int):
+        """
+        Accés per índex als servidors de forwards.
+        """
+        return list(self._forward_servers.values())[index]
+
+    def __len__(self):
+        """Nombre de forwards actius."""
+        return len(self._forward_servers)
+
+    def __iter__(self):
+        """Iterador sobre els servidors de forwards."""
+        return iter(self._forward_servers.values())
+
+    def pop(self, key: int) -> Optional[Any]:
+        """
+        Elimina i retorna el servidor de forward associat a un port local.
+        :param key: port local
+        :return: el servidor eliminat o None si no existeix
+        """
+        return self._forward_servers.pop(key, None)
+
+    def __str__(self) -> str:
+        """Representació amigable del túnel amb forwards."""
+        base = f"{self.ssh_username}@{self.ssh_host}:{self.ssh_port}"
+        if not self._forward_servers:
+            return f"{base} (sense forwards actius)"
+        forwards = ", ".join(str(fwd) for fwd in self._forward_servers.values())
+        return f"{base} -> [{forwards}]"
+
+    def __repr__(self) -> str:
+        """Representació tècnica per a debugging."""
+        return (f"<SSHTunnel user={self.ssh_username} host={self.ssh_host} "
+                f"port={self.ssh_port} forwards={len(self._forward_servers)}>")

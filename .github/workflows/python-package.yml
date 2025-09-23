@@ -1,15 +1,25 @@
 name: Python package
 
 on:
-  pull_request:
-    branches:
-      - master
-  workflow_dispatch:
-    inputs:
-      tests:
-        description: "Quins tests executar? Coma-separats o 'all'"
-        required: false
-        default: "all"
+   pull_request:
+      branches:
+        - master
+   workflow_dispatch:
+      inputs:
+        build:
+          description: "Quins tests executar? Coma-separats o 'all'"
+          required: false
+          default: "all"
+        version_type:
+          description: 'Version bump type (only runs after successful tests)'
+          required: false
+          default: ''
+          type: choice
+          options:
+            - ''
+            - patch
+            - minor
+            - major
 
 jobs:
   build:
@@ -93,3 +103,113 @@ jobs:
         run: |
           echo "Esborrant entorn virtual..."
           rm -rf "$VIRTUAL_ENV"
+
+  bump-version:
+    # Only run version bump job if:
+    # - Tests pass successfully AND
+    # - It's a manual workflow_dispatch trigger AND
+    # - version_type input is provided (not empty)
+    if: >
+      always() &&
+      (needs.test.result == 'success') &&
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.version_type != '')
+
+    needs: build
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install bump2version
+        run: pip install bump2version
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Get current version
+        id: current_version
+        run: |
+          if [ -f setup.py ]; then
+            VERSION=$(python setup.py --version)
+          elif [ -f src/GABDConnect/__init__.py ]; then
+            VERSION=$(python -c "import sys; sys.path.insert(0, 'src'); from GABDConnect import __version__; print(__version__)")
+          else
+            VERSION="0.1.0"
+          fi
+          echo "current=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+
+      - name: Bump version
+        id: bump
+        run: |
+          echo "Bumping version with type: ${{ github.event.inputs.version_type }}"
+
+          # Check if .bumpversion.cfg exists, if not create it
+          if [ ! -f .bumpversion.cfg ]; then
+            echo "Creating .bumpversion.cfg"
+            cat > .bumpversion.cfg << EOF
+          [bumpversion]
+          current_version = ${{ steps.current_version.outputs.current }}
+          commit = True
+          tag = True
+          tag_name = v{new_version}
+          message = Bump version: {current_version} → {new_version}
+
+          [bumpversion:file:setup.py]
+          search = version="{current_version}"
+          replace = version="{new_version}"
+
+          [bumpversion:file:src/GABDConnect/__init__.py]
+          search = __version__ = "{current_version}"
+          replace = __version__ = "{new_version}"
+          EOF
+            git add .bumpversion.cfg
+            git commit -m "Add bumpversion configuration"
+          fi
+
+          # Perform the version bump
+          bump2version ${{ github.event.inputs.version_type }} --verbose
+
+          # Get the new version
+          NEW_VERSION=$(bump2version --dry-run --list ${{ github.event.inputs.version_type }} | grep new_version | cut -d= -f2)
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "Version bumped to: $NEW_VERSION"
+
+      - name: Push changes
+        run: |
+          echo "Pushing changes and tags..."
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin --tags
+
+      - name: Create Release
+        if: success()
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.bump.outputs.new_version }}
+          release_name: Release v${{ steps.bump.outputs.new_version }}
+          body: |
+            ## Changes in v${{ steps.bump.outputs.new_version }}
+
+            ### 🚀 What's Changed
+            - Version bumped from ${{ steps.current_version.outputs.current }} to ${{ steps.bump.outputs.new_version }}
+            - Type: `${{ github.event.inputs.version_type }}` version bump
+
+            ### 📝 Manual Release
+            This release was created manually through GitHub Actions workflow.
+
+            ### 🔗 Full Changelog
+            Compare changes: [${{ steps.current_version.outputs.current }}...v${{ steps.bump.outputs.new_version }}](${{ github.server_url }}/${{ github.repository }}/compare/v${{ steps.current_version.outputs.current }}...v${{ steps.bump.outputs.new_version }})
+          draft: false
+          prerelease: false
