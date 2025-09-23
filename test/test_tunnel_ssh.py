@@ -49,7 +49,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         """
         with  GABDSSHTunnel(hostname=self.hostname, port=self.port,
                                ssh_data=self.ssh_server) as server:
-            self.assertTrue(server.is_active())
+            self.assertTrue(server.is_open())
 
         print(
             f"SSH tunnel to {self.hostname}:{self.port} via {self.ssh_server['ssh']} closed."
@@ -64,7 +64,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
         with GABDSSHTunnel(hostname=hostname, port=self.port,
                                ssh_data=self.ssh_server, local_port=local_port,
                                multiple_tunnels=self.multiple_tunnels) as server:
-            self.assertTrue(server.is_active())
+            self.assertTrue(server.is_open())
 
         print(
             f"SSH tunnel to {self.hostname}:{self.port} via {self.ssh_server['ssh']} closed."
@@ -81,7 +81,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
                            ssh_data=self.ssh_server, local_port=local_port,
                            multiple_tunnels=self.multiple_tunnels) as server:
 
-            self.assertTrue(server.is_active())
+            self.assertTrue(server.is_open())
 
         print(
             f"SSH tunnel to {self.hostname}:{self.port} via {self.ssh_server['ssh']} closed."
@@ -108,7 +108,7 @@ class GABDSSHTunnelTestCase(unittest.TestCase):
                            multiple_tunnels=self.multiple_tunnels)
             ssh_tunnel.opentunnel()
             # 2. Verifica que tots els túneles s'han establert correctament.
-            self.assertTrue(ssh_tunnel.is_active())
+            self.assertTrue(ssh_tunnel.is_open())
             all_ssh_tunnels.add(ssh_tunnel)
 
         # 3. Comprova que el nombre de túneles és correcte.

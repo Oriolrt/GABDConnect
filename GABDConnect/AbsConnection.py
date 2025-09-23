@@ -124,6 +124,15 @@ class GABDSSHTunnel:
     def port(self, valor: str):
         self._port = valor
 
+    @property
+    def dsn(self):
+        return self._dsn
+
+    @dsn.setter
+    def dsn(self, valor: str):
+        self.dsn = valor
+
+
     def __enter__(self):
         self.opentunnel()
         return self
@@ -360,7 +369,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
     Aquesta classe abstracta emmagatzema informació bàsica de connexió i mètodes per connectar-se a DBMS.
     """
 
-    __slots__ = ['_conn', '_is_started', '_user', '_pwd']
+    __slots__ = ['_conn', '_is_open', '_user', '_pwd','_dsn']
 
     def __init__(self, **params):
         """
@@ -373,7 +382,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
         """
 
         self._conn = None
-        self._is_started = False
+        self._is_open = False
         self._user = params.pop('user', None)
         self._pwd = params.pop('passwd', None)
         # self._bd = params.pop('bd', None)
@@ -389,7 +398,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
     @conn.setter
     def conn(self, valor):
         self._conn = valor
-        self._is_started = True
+        self._is_open = True
 
     @property
     def server(self):
@@ -398,32 +407,32 @@ class AbsConnection(ABC, GABDSSHTunnel):
         return self._servers[key] if key in self._servers else None
 
     @property
-    def is_started(self):
-        return self._is_started
+    def is_open(self):
+        return self._is_open
 
-    @is_started.setter
-    def is_started(self, valor: bool):
-        self._is_started = valor
+    @is_open.setter
+    def is_open(self, valor: bool):
+        self._is_open = valor
 
     @property
     def isStarted(self) -> bool:
         warnings.warn(
             "isStarted està obsolet i s'eliminarà en futures versions. "
-            "Fes servir is_started en el seu lloc.",
+            "Fes servir is_open en el seu lloc.",
             DeprecationWarning,
             stacklevel=2
         )
-        return self._is_started
+        return self._is_open
 
     @isStarted.setter
     def isStarted(self, valor: bool):
         warnings.warn(
             "isStarted està obsolet i s'eliminarà en futures versions. "
-            "Fes servir is_started en el seu lloc.",
+            "Fes servir is_open en el seu lloc.",
             DeprecationWarning,
             stacklevel=2
         )
-        self._is_started = valor
+        self._is_open = valor
 
     @property
     def user(self):
@@ -473,7 +482,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
         self.__setattr__(key, value)
 
     @abstractmethod
-    def open(self):
+    def open(self,**kwargs):
         """
         Connecta a un servidor DBMS amb la informació de connexió guardada.
 
@@ -483,8 +492,6 @@ class AbsConnection(ABC, GABDSSHTunnel):
         """
 
         super().opentunnel()  # Obre el túnel SSH
-
-        self._is_started = self.is_active()
 
         self._context_mode = "session"
         return self
@@ -498,7 +505,14 @@ class AbsConnection(ABC, GABDSSHTunnel):
         --------
         None
         """
-        self._is_started = False
+
+        self.close_session()
+
+    def close_session(self):
+        self._is_open = False
+
+    def open_session(self):
+        self._is_open = True
 
     def commit(self):
         """

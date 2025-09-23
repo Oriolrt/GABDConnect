@@ -25,7 +25,7 @@ class mongoConnection(AbsConnection):
       Classe per gestionar la connexió a una base de dades MongoDB.
     """
 
-    __slots__ = ['_auth_db', '_bd', '_auth_activated','_bd_name','_mongo_uri']
+    __slots__ = ['_auth_db', '_bd', '_auth_activated','_bd_name']
 
     def __init__(self, **params):
         '''
@@ -49,9 +49,9 @@ class mongoConnection(AbsConnection):
         self._auth_activated = self.user is not None and (isinstance(self.user,str) and len(self.user) > 0)
 
         if not self._auth_activated:
-            self._mongo_uri = f"mongodb://localhost:{self._local_port}/{self._auth_db}"
+            self.dsn = f"mongodb://localhost:{self._local_port}/{self._auth_db}"
         else:
-            self._mongo_uri = f"mongodb://{params['user']}:{params['pwd']}@localhost:{self._local_port}/{self._auth_db}"
+            self.dsn = f"mongodb://{params['user']}:{params['pwd']}@localhost:{self._local_port}/{self._auth_db}"
 
     @property
     def bd(self):
@@ -88,7 +88,7 @@ class mongoConnection(AbsConnection):
             if self.conn:
                 # Tanquem la connexió anterior si ja estava oberta
                 self.close_session()
-            self.conn = MongoClient(self._mongo_uri, serverSelectionTimeoutMS=100)
+            self.conn = MongoClient(self.dsn, serverSelectionTimeoutMS=100)
             self.conn.server_info()  # force connection on a request as the  # connect=True parameter of MongoClient seems  # to be useless here
             self.is_started = True
             self.bd = self.conn[self.bd_name]

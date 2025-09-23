@@ -60,7 +60,7 @@ class OracleConnectTestCase(unittest.TestCase):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
                            passwd=self.pwd, serviceName=self.serviceName) as db:
 
-            self.assertTrue(db.is_active(), f"Should be able to connect to the Oracle database in {db} \
+            self.assertTrue(db.is_open, f"Should be able to connect to the Oracle database in {db} \
             through SSH tunnel")
 
 
@@ -97,7 +97,7 @@ class OracleConnectTestCase(unittest.TestCase):
             serviceName=serviceName,
             multiple_tunnels=self.multiple_tunnels
         ) as db:
-            self.assertTrue(db.is_active(), f"Should be able to connect to the Oracle database in {db}  through SSH tunnel")
+            self.assertTrue(db.is_open, f"Should be able to connect to the Oracle database in {db}  through SSH tunnel")
 
 
         time.sleep(5)
@@ -118,7 +118,7 @@ class OracleConnectTestCase(unittest.TestCase):
         ) as db:
 
             self.assertTrue(
-                db.is_active(),
+                db.is_open,
                 f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
             )
 
@@ -160,7 +160,7 @@ class OracleConnectTestCase(unittest.TestCase):
         ) as db:
 
             self.assertTrue(
-                db.is_active(),
+                db.is_open,
                 f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
             )
 
@@ -309,7 +309,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
 
         for d in all_dbs:
-            self.assertFalse(d.is_open(), f"Database {d} should be closed.")  # add assertion here
+            self.assertFalse(d.is_open, f"Database {d} should be closed.")  # add assertion here
             del d
 
         time.sleep(5)

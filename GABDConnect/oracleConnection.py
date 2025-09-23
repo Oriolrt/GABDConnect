@@ -34,7 +34,7 @@ class oracleConnection(AbsConnection):
         Data Source Name per a la connexió a la base de dades.
     """
 
-    __slots__ = ['_cursor', '_serviceName', '_dsn', '_con_params']
+    __slots__ = ['_cursor', '_serviceName', '_con_params']
 
     def __init__(self, **params):
         """
@@ -96,28 +96,19 @@ class oracleConnection(AbsConnection):
         # Si no es passa dsn, el creem a partir de host/port/service_name o de self._dsn
         if dsn is None:
             if host and port and service_name:
-                dsn_to_use = makedsn(host, port, service_name=service_name)
-            else:
-                dsn_to_use = self._dsn
+                self.dsn = makedsn(host, port, service_name=service_name)
+
         else:
-            dsn_to_use = dsn
+            self.dsn = dsn
 
         con_params_to_use = {**self._con_params, **con_params}
 
         try:
-            self.conn = connect(dsn_to_use, **con_params_to_use)
-            if self.conn is not None:
-                self._cursor = self.conn.cursor()
-                self.is_started = True
-            else:
-                self.is_started = False
-                t = self.server
-                raise RuntimeError(f"Could not open the connection with dsn: {self._dsn}. Check the connection " + \
-                                   f"parameters and its status. Tunnel: {t}")
+            self.conn = self.open_session( **con_params_to_use )
 
         except DatabaseError as e:
             #self.closeTunnel()
-            self.is_started = False
+            self.is_open = False
             logging.error(
                 f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." + \
                 f" Tunnel: {self.server}")
@@ -125,6 +116,20 @@ class oracleConnection(AbsConnection):
         finally:
             self._context_mode = "session"
             return self
+
+    def open_session(self,  **con_params ):
+        conn = connect(self.dsn, **con_params)
+        if conn is not None:
+            self.conn = conn
+            self._cursor = self.conn.cursor()
+            self.is_open = True
+        else:
+            self.is_open = False
+            t = self.server
+            raise RuntimeError(f"Could not open the connection with dsn: {self._dsn}. Check the connection " + \
+                               f"parameters and its status. Tunnel: {t}")
+
+        return self.conn
 
     def close(self) -> None:
         """
@@ -136,7 +141,7 @@ class oracleConnection(AbsConnection):
         """
         try:
             self.conn.close()
-            self.is_started = False
+            self.is_open = False
         except DatabaseError:
             logging.warning('Database connection already closed')
         except AttributeError as e:
@@ -165,7 +170,7 @@ class oracleConnection(AbsConnection):
         except AttributeError as e:
             print(f"Connexió a {self._dsn} tancada.")
 
-        self.is_started = False
+        self.is_open = False
 
     def commit(self) -> None:
         """
@@ -209,7 +214,7 @@ class oracleConnection(AbsConnection):
             True si la sessió s'ha iniciat correctament, False en cas contrari.
         """
         self.open()
-        return self.is_started
+        return self.is_open
 
     def showMessages(self) -> None:
         """
@@ -227,6 +232,7 @@ class oracleConnection(AbsConnection):
                 break
             print(lineVar.getvalue())
 
+    @property
     def is_open(self) -> bool:
         """
         Retorna True si la connexió Oracle està oberta.
@@ -238,6 +244,13 @@ class oracleConnection(AbsConnection):
             return self.conn.ping() is None  # retorna None si la connexió és vàlida
         except Exception:
             return False
+
+    @is_open.setter
+    def is_open(self, valor: bool) -> None:
+        # Setter buit per evitar errors en assignacions
+        self._is_open = valor
+
+
 
     # Context manager
     def __enter__(self):
