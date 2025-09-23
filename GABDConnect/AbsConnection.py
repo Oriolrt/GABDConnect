@@ -130,7 +130,7 @@ class GABDSSHTunnel:
 
     @dsn.setter
     def dsn(self, valor: str):
-        self.dsn = valor
+        self._dsn = valor
 
 
     def __enter__(self):

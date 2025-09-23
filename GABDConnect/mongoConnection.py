@@ -85,28 +85,32 @@ class mongoConnection(AbsConnection):
         AbsConnection.open(self)
 
         try:
-            if self.conn:
+            if self.is_open:
                 # Tanquem la connexió anterior si ja estava oberta
                 self.close_session()
-            self.conn = MongoClient(self.dsn, serverSelectionTimeoutMS=100)
-            self.conn.server_info()  # force connection on a request as the  # connect=True parameter of MongoClient seems  # to be useless here
-            self.is_started = True
-            self.bd = self.conn[self.bd_name]
+
+            self.open_session()
             logger.debug("Connexió a MongoDB oberta.")
         except ServerSelectionTimeoutError as err:
             self.closetunnel()
-            self.is_started = False
+            # self.is_started = False
             self.conn = None
             logger.error(f"[ERROR] No s'ha pogut connectar a MongoDB: {err}")
             # do whatever you need
-        except errors.PyMongoError as e:
+        except errors.OperationFailure as e:
             self.closetunnel()
-            self.is_started = False
+            # self.is_started = False
             self.conn = None
-            raise RuntimeError(f"[ERROR] Error en establir la connexió MongoDB: {e}")
+            raise
 
 
         return self.conn
+
+    def open_session(self):
+        self.conn = MongoClient(self.dsn, serverSelectionTimeoutMS=100)
+        self.conn.server_info()  # force connection on a request as the  # connect=True parameter of MongoClient seems  # to be useless here
+        # self.is_started = True
+        self.bd = self.conn[self.bd_name]
 
     def close_session(self):
         """
@@ -158,10 +162,10 @@ class mongoConnection(AbsConnection):
         except AttributeError:
             print("[WARN] L'objecte MongoClient no existeix (self.conn és None).")
 
-        finally:
-            self.conn = None
-            self.bd = None
-            self.is_started = False
+        # finally:
+        #    self.conn = None
+        #    self.bd = None
+        #    self.is_started = False
 
     def startSession(self):
         """
