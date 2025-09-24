@@ -21,6 +21,7 @@ from paramiko.client import SSHClient
 from paramiko import WarningPolicy
 from getpass import getpass
 import logging
+from contextlib import contextmanager
 
 
 # Configure logging
@@ -532,7 +533,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
         """
         pass
 
-
+    @contextmanager
     def openClientSSH(self, user : str, pwd, remote_host : Optional[str] = None,
                       remote_port : Optional[int] = 22, local_port : Optional[int] = None) -> SSHClient:
         """
@@ -566,9 +567,26 @@ class AbsConnection(ABC, GABDSSHTunnel):
             logging.error(f"*** Failed to connect to {user}@{remote_host}:{remote_port}")
             raise RuntimeError(f"*** Failed to connect to {user}@{remote_host}:{remote_port}","NO_SSH_CONNECTION") from e
 
+        try:
+            yield client
+        finally:
+            client.close()
+            tunel.remove_forward(local_port)
 
 
-        return client
+
+    def closeClientSSH(self, client: SSHClient):
+        """
+          Tanca el túnel SSH cap al servidor DBMS.
+
+          Retorna:
+          --------
+          None
+        """
+        client.close()
+        tunel = self.get_tunnel()
+        # Cal recuperar el forward que s'ha obert
+        tunel.remove_forward()
 
     @abstractmethod
     def test_connection(self):

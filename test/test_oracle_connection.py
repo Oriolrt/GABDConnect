@@ -446,7 +446,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         # fem el test que no hi ha tunels oberts
         db.close()
-        db.close_all_tunnels()
+        # db.close_all_tunnels()
         self.assertIsNone(db.server, "SSH tunnel should be closed after exiting the context")
 
 

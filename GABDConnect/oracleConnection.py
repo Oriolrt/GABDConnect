@@ -258,7 +258,16 @@ class oracleConnection(AbsConnection):
 
     # Context manager
     def __enter__(self):
+        """
+        Obre la connexió Oracle quan s'entra al context manager.
+        """
+        if self._context_mode == "session":
+            if self.is_open:
+                return self
+            else:
+                raise RuntimeError("La sessió Oracle no està oberta")
 
+        # Obrim la connexió en condicions normals
         success = self.open()  # sense arguments → utilitza self._dsn
         if not success:
             raise RuntimeError("No s'ha pogut obrir la connexió Oracle")
