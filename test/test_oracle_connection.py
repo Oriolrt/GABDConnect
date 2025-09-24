@@ -7,7 +7,8 @@ import os
 
 USED_PORTS = set()
 
-def get_unique_free_port(port = None):
+
+def get_unique_free_port(port=None):
     port = port if port is not None else get_free_port()
     while port in USED_PORTS:
         port = get_free_port()
@@ -58,11 +59,10 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_sshtunnel_default_connection(self):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
-                           passwd=self.pwd, serviceName=self.serviceName) as db:
+                  passwd=self.pwd, serviceName=self.serviceName) as db:
 
             self.assertTrue(db.is_open, f"Should be able to connect to the Oracle database in {db} \
             through SSH tunnel")
-
 
         time.sleep(5)
 
@@ -99,7 +99,6 @@ class OracleConnectTestCase(unittest.TestCase):
         ) as db:
             self.assertTrue(db.is_open, f"Should be able to connect to the Oracle database in {db}  through SSH tunnel")
 
-
         time.sleep(5)
 
     def test_consulta_basica_connection(self):
@@ -135,7 +134,6 @@ class OracleConnectTestCase(unittest.TestCase):
             except Exception as e:
                 self.fail(f"Failed to execute basic query: {e}")
 
-
         time.sleep(5)
 
     def test_dba_connection(self):
@@ -148,7 +146,7 @@ class OracleConnectTestCase(unittest.TestCase):
         hostname = "oracle-2.grup00.gabd"
 
         # Crear client Oracle amb túnel SSH
-        with  orcl(
+        with orcl(
             hostname=hostname,
             port=self.port,
             ssh_data=self.ssh_server,
@@ -193,7 +191,6 @@ class OracleConnectTestCase(unittest.TestCase):
                         print(row)
             except Exception as e:
                 self.fail(f"Failed to execute database query: {e}")
-
 
         time.sleep(5)
 
@@ -307,12 +304,56 @@ class OracleConnectTestCase(unittest.TestCase):
                 print(f"Error during query execution: {e}")
                 pass
 
-
         for d in all_dbs:
             self.assertFalse(d.is_open, f"Database {d} should be closed.")  # add assertion here
             del d
 
         time.sleep(5)
+
+    def test_dba_and_user_connection(self):
+        """
+        Test obrir una connexió amb dba i alternar amb la d'un usuari normal fent servir els contextos (with)
+
+        """
+
+        dba_user = 'sys'
+        dba_pwd = 'oracle'
+        mode = 'sysDBA'
+        self.ssh_server['port'] = 8192
+        hostname = 'oracle-1.grup00.gabd'
+
+        user = "ESPECTACLES"
+        pwd = "ESPECTACLES"
+
+
+
+        db = orcl(
+            user=dba_user,
+            passwd=dba_pwd,
+            hostname=hostname,
+            ssh_data=self.ssh_server,
+            serviceName=self.serviceName,
+            mode=mode,
+        )
+
+        db.open()
+        self.assertTrue(db.is_open, "Database should be open after calling open()")
+
+        with db.cursor() as curs:
+            curs.execute("SELECT * FROM v$database")
+            result = curs.fetchall()
+            self.assertGreater(len(result), 0, "Query should return results")
+            print("DBA Query Result:", result)
+
+        with db.open(user=user, passwd=pwd) as user_conn:
+            with user_conn.cursor() as user_curs:
+                user_curs.execute("SELECT * FROM USER_USERS")
+                user_result = user_curs.fetchall()
+                self.assertGreater(len(user_result), 0, "User query should return results")
+                print("User Query Result:", user_result)
+
+
+
 
 
 if __name__ == '__main__':
