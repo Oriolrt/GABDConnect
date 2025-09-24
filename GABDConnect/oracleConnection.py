@@ -104,20 +104,20 @@ class oracleConnection(AbsConnection):
         con_params_to_use = {**self._con_params, **con_params}
 
         try:
-            self.conn = self.open_session( **con_params_to_use )
+            self.conn = self.open_session(**con_params_to_use)
 
         except DatabaseError as e:
-            #self.closeTunnel()
+            # self.closeTunnel()
             self.is_open = False
             logging.error(
-                f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." + \
+                f"Could not open the connection with dsn: {self._dsn}. Check the connection parameters and its status." +
                 f" Tunnel: {self.server}")
             logging.error(f"Error: {e}")
         finally:
             self._context_mode = "session"
             return self
 
-    def open_session(self,  **con_params ):
+    def open_session(self, **con_params):
         conn = connect(self.dsn, **con_params)
         if conn is not None:
             self.conn = conn
@@ -140,12 +140,16 @@ class oracleConnection(AbsConnection):
         None
         """
         try:
-            self.conn.close()
-            self.is_open = False
+            if self.is_open:
+                self.conn.close()
+                self.is_open = False
         except DatabaseError:
             logging.warning('Database connection already closed')
-        except AttributeError as e:
-            print(f"Connexió a {self._dsn} tancada.")
+        except AttributeError:
+            logging.warning(f"Connexió a {self._dsn} tancada.")
+        finally:
+            if self._context_mode is None or self._context_mode == "Tunnel":
+                self.closetunnel()
 
     def close_session(self) -> None:
         """
@@ -159,7 +163,7 @@ class oracleConnection(AbsConnection):
         try:
             if self._cursor is not None:
                 self._cursor.close()
-        except:
+        except Exception:
             self._cursor = None
 
         try:
@@ -200,7 +204,7 @@ class oracleConnection(AbsConnection):
 
             print("Current user: {}, Current schema: {}".format(res[0], res[1]))
             return True
-        except:
+        except Exception:
             logging.error("Database is not open. Check the connection parameters and its status.")
             return False
 
@@ -254,7 +258,16 @@ class oracleConnection(AbsConnection):
 
     # Context manager
     def __enter__(self):
+        """
+        Obre la connexió Oracle quan s'entra al context manager.
+        """
+        if self._context_mode == "session":
+            if self.is_open:
+                return self
+            else:
+                raise RuntimeError("La sessió Oracle no està oberta")
 
+        # Obrim la connexió en condicions normals
         success = self.open()  # sense arguments → utilitza self._dsn
         if not success:
             raise RuntimeError("No s'ha pogut obrir la connexió Oracle")
