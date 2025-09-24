@@ -17,8 +17,16 @@ import warnings
 from abc import ABC, abstractmethod
 from .ssh_tunnel import SSHTunnel, get_free_port
 from typing import Optional, Any, Union
-
+from paramiko.client import SSHClient
+from paramiko import WarningPolicy
 from getpass import getpass
+import logging
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 
 warnings.filterwarnings(
@@ -228,7 +236,7 @@ class GABDSSHTunnel:
 
         # Determinar quin port local s'estava utilitzant
         if self._mt is not None:
-            local_ports = list(self._mt.keys())
+            local_ports = set(tunnel.local_bind_ports) | set(self._mt.keys())
         else:
             local_ports = [int(self._local_port)]
             # TODO: Això ha de ser un diccionari on els values són el nombre de connexions \
@@ -523,6 +531,44 @@ class AbsConnection(ABC, GABDSSHTunnel):
           None
         """
         pass
+
+
+    def openClientSSH(self, user : str, pwd, remote_host : Optional[str] = None,
+                      remote_port : Optional[int] = 22, local_port : Optional[int] = None) -> SSHClient:
+        """
+          Obre el túnel SSH cap al servidor DBMS.
+
+          Retorna:
+          --------
+          paramiko.SSHClient
+
+        """
+        # Si no hi ha paràmetres, es fan servir els de la connexió
+        if remote_host is None:
+            remote_host = self._hostname
+        if remote_port is None:
+            remote_port = self._port
+        if local_port is None:
+            local_port = get_free_port()
+
+        tunel = self.get_tunnel()
+
+        tunel.add_forward( remote_host, remote_port,  local_port = local_port)
+
+        client = SSHClient()
+        client.load_system_host_keys()
+        client.set_missing_host_key_policy(WarningPolicy())
+
+        try:
+            client.connect('localhost', local_port, user, pwd)
+
+        except Exception as e:
+            logging.error(f"*** Failed to connect to {user}@{remote_host}:{remote_port}")
+            raise RuntimeError(f"*** Failed to connect to {user}@{remote_host}:{remote_port}","NO_SSH_CONNECTION") from e
+
+
+
+        return client
 
     @abstractmethod
     def test_connection(self):

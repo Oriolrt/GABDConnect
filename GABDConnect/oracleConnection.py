@@ -140,12 +140,16 @@ class oracleConnection(AbsConnection):
         None
         """
         try:
-            self.conn.close()
-            self.is_open = False
+            if self.is_open:
+                self.conn.close()
+                self.is_open = False
         except DatabaseError:
             logging.warning('Database connection already closed')
         except AttributeError:
-            print(f"Connexió a {self._dsn} tancada.")
+            logging.warning(f"Connexió a {self._dsn} tancada.")
+        finally:
+            if self._context_mode is None or self._context_mode == "Tunnel":
+                self.closetunnel()
 
     def close_session(self) -> None:
         """

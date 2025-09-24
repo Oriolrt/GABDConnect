@@ -2,10 +2,52 @@ import time
 import unittest
 from GABDConnect.oracleConnection import oracleConnection as orcl
 from GABDConnect.ssh_tunnel import get_free_port
+from typing import Optional, List, Union
 import logging
 import os
 
 USED_PORTS = set()
+
+
+def free_space(client, disks: Optional[Union[List[str], str]] = '/', avail_space_threshold_gb: float = 1.0) -> dict:
+    list_disk = " ".join(disks) if isinstance(disks, list) else disks
+    stdin, stdout, stderr = client.exec_command('df -h ' + list_disk)
+    output = stdout.read().decode()
+    print("Disk Space Info:\n", output)
+    # output dictionary composed of disk_path: avail_space
+    free_disc = {}
+    low_space_disks = {}
+    # Parse the output to find available space
+    for lines in output.splitlines():
+        if len(lines) > 1:
+            parts = lines.split()
+            if len(parts) >= 4:
+                disk = parts[0]
+                avail_space = parts[3]
+                print(f"Available space: {avail_space}")
+                # Assuming the format is in GB for simplicity
+                if avail_space.endswith('G'):
+                    avail_gb = float(avail_space[:-1])
+                    free_disc[disk] = avail_gb
+                    if avail_gb < avail_space_threshold_gb:
+                        low_space_disks[disk] = avail_gb
+                elif avail_space.endswith('M'):
+                    avail_gb = float(avail_space[:-1]) / 1024
+                    free_disc[disk] = avail_gb
+                    if avail_gb < avail_space_threshold_gb:
+                        low_space_disks[disk] = avail_gb
+                elif avail_space.endswith('K'):
+                    avail_gb = float(avail_space[:-1]) / (1024 * 1024)
+                    free_disc[disk] = avail_gb
+                    if avail_gb < avail_space_threshold_gb:
+                        low_space_disks[disk] = avail_gb
+
+
+    # Llençar l'excepció si hi ha algun disk amb poc espai
+    if low_space_disks:
+        raise Exception("Some disks have less than 1GB free space!", "NO_DISK_SPACE", low_space_disks)
+
+    return free_disc
 
 
 def get_unique_free_port(port=None):
@@ -60,7 +102,6 @@ class OracleConnectTestCase(unittest.TestCase):
     def test_sshtunnel_default_connection(self):
         with orcl(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, user=self.user,
                   passwd=self.pwd, serviceName=self.serviceName) as db:
-
             self.assertTrue(db.is_open, f"Should be able to connect to the Oracle database in {db} \
             through SSH tunnel")
 
@@ -208,7 +249,7 @@ class OracleConnectTestCase(unittest.TestCase):
         group_connections_info = {}
 
         file = f"grup00 {self.ssh_server['port']} {self.ssh_server['id_key']}\n"
-        file += f"grup01 {self.ssh_server['port']+1} {self.ssh_server['id_key']}"
+        file += f"grup01 {self.ssh_server['port'] + 1} {self.ssh_server['id_key']}"
         local_port_counter = get_unique_free_port(1521)
 
         for line in file.strip().split('\n'):
@@ -219,7 +260,7 @@ class OracleConnectTestCase(unittest.TestCase):
                 # Create the tunnels dictionary for the current group
 
                 tunnels = {get_unique_free_port(local_port_counter): f"oracle-1.{group_name}.gabd:1521",
-                           get_unique_free_port(local_port_counter+1): (f"oracle-2.{group_name}.gabd", 1521)}
+                           get_unique_free_port(local_port_counter + 1): (f"oracle-2.{group_name}.gabd", 1521)}
                 # Store the tunnels dictionary in the group_tunnels dictionary
                 group_tunnels[group_name] = tunnels
                 #
@@ -325,8 +366,6 @@ class OracleConnectTestCase(unittest.TestCase):
         user = "ESPECTACLES"
         pwd = "ESPECTACLES"
 
-
-
         db = orcl(
             user=dba_user,
             passwd=dba_pwd,
@@ -352,8 +391,63 @@ class OracleConnectTestCase(unittest.TestCase):
                 self.assertGreater(len(user_result), 0, "User query should return results")
                 print("User Query Result:", user_result)
 
+    def test_openClientSSH(self):
+        """
+        Obrir una connexió amb dba fer una consulta per saber si hi ha cap còpia de seguretat realitzada i la data. Després
+        obrir un client ssh al mateix hostname i mirar l'espai lliure de disc dur que hi ha a la màquina remota. En cas que
+        l'espai lliure sigui menor de 1GB llençar una excepció.
+
+        """
+        dba_user = 'sys'
+        dba_pwd = 'oracle'
+        mode = 'sysDBA'
+        self.ssh_server['port'] = 8192
+        hostname = 'oracle-1.grup00.gabd'
+        host_user = 'oracle'
+        host_pwd = 'oracle'
+
+        disk_units = ['/', '/opt/oracle/oradata', '/home/oracle/backup/']
+
+        db = orcl(
+            user=dba_user,
+            passwd=dba_pwd,
+            hostname=hostname,
+            ssh_data=self.ssh_server,
+            serviceName=self.serviceName,
+            mode=mode,
+        )
+
+        with db.open() as conn:
+            with conn.cursor() as curs:
+                curs.execute("""SELECT COUNT(*)                  AS total_backups,
+                                   MIN(b.completion_time)    AS first_backup_date,
+                                   MAX(b.completion_time)    AS last_backup_date,
+                                   ROUND(AVG(p.bytes)/1024/1024/1024, 2) AS avg_backup_size_gb,
+                                   LISTAGG(DISTINCT REGEXP_SUBSTR(p.handle, '.*[\\/]', 1, 1)) 
+                                       WITHIN GROUP (ORDER BY REGEXP_SUBSTR(p.handle, '.*[\\/]', 1, 1)) AS backup_directories
+                            FROM   v$backup_piece p
+                            JOIN   v$backup_set b 
+                              ON   p.set_stamp = b.set_stamp 
+                             AND   p.set_count = b.set_count""")
+                for row in curs:
+                    print("Backup Info:", row)
+
+        # fem el test que estant tancades les connexions
+        self.assertFalse(db.is_open, "Database should be closed after exiting the context")
+
+        with db.openClientSSH(host_user, host_pwd) as clientSSH:
+            try:
+                res = free_space(clientSSH, disk_units)
+                print("Disk Space Info:", res)
+            except Exception as e:
+                msg, code, space = e.args
+                self.fail(f"{msg}. Available space: {space}GB")
 
 
+        # fem el test que no hi ha tunels oberts
+        db.close()
+        db.close_all_tunnels()
+        self.assertIsNone(db.server, "SSH tunnel should be closed after exiting the context")
 
 
 if __name__ == '__main__':
