@@ -500,7 +500,9 @@ class AbsConnection(ABC, GABDSSHTunnel):
         self
         """
 
-        super().opentunnel()  # Obre el túnel SSH
+        # si cal, obre el túnel SSH (mira si _ssh_data no és None)
+        if self._ssh_data is not None:
+            super().opentunnel()  # Obre el túnel SSH
 
         self._context_mode = "session"
         return self
