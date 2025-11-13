@@ -449,6 +449,45 @@ class OracleConnectTestCase(unittest.TestCase):
         # db.close_all_tunnels()
         self.assertIsNone(db.server, "SSH tunnel should be closed after exiting the context")
 
+    def test_without_ssh_tunnel(self):
+        """
+        Obrir connexió directa sense necessitat de fer un tunnel ssh
+
+        """
+
+        hostname="localhost"
+        port=1521
+
+        # Crear client Oracle amb túnel SSH
+        with orcl(
+            hostname=hostname,
+            port=port,
+            ssh_data=None,  # No SSH tunnel
+            user=self.user,
+            passwd=self.pwd,
+            local_port=None,  # No local port needed
+            serviceName=self.serviceName
+        ) as db:
+
+            self.assertTrue(
+                db.is_open,
+                f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
+            )
+
+            try:
+                # Executar consulta bàsica
+                with db.cursor() as curs:
+                    curs.execute("""
+                            SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
+                            UNION
+                            SELECT 'Carles' AS nom, 'Sánchez' AS cognom FROM dual
+                        """)
+                    for row in curs:
+                        print(row)
+            except Exception as e:
+                self.fail(f"Failed to execute basic query: {e}")
+
+        time.sleep(5)
 
 if __name__ == '__main__':
     unittest.main()
