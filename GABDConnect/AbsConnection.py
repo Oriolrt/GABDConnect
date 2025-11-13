@@ -158,18 +158,29 @@ class GABDSSHTunnel:
           bool
           """
 
-        if self._mt is not None:
+
+        if getattr(self, "_ssh_data", None) is None:
+            # Advertim que no hi ha dades SSH
+            warnings.warn(
+                "No s'han proporcionat dades SSH; no s'obrirà cap túnel.",
+                UserWarning,
+                stacklevel=2
+            )
+            return True  # ja està obert
+            #raise ValueError("Falten dades SSH")
+
+
+        ssh_data = self._ssh_data
+        key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
+
+        # Configurar els binds remots i locals
+        if getattr(self, "_mt", None) is not None:
             remote_binds = [(remote_host, remote_port) for _, (remote_host, remote_port) in self._mt.items()]
             local_binds = [("", local_port) for local_port in self._mt.keys()]
         else:
             remote_binds = [(self._hostname, int(self._port))]
             local_binds = [("", int(self._local_port))]
 
-        if self._ssh_data is None:
-            raise ValueError("Falten dades SSH")
-
-        ssh_data = self._ssh_data
-        key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
 
         # Comprovar si ja existeix el túnel per aquest host
         if key not in GABDSSHTunnel._servers:
@@ -378,7 +389,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
     Aquesta classe abstracta emmagatzema informació bàsica de connexió i mètodes per connectar-se a DBMS.
     """
 
-    __slots__ = ['_conn', '_is_open', '_user', '_pwd','_dsn']
+    __slots__ = ['_conn', '_is_open', '_user', '_pwd','_dsn','_success','_context_mode',]
 
     def __init__(self, **params):
         """
@@ -397,8 +408,15 @@ class AbsConnection(ABC, GABDSSHTunnel):
         # self._bd = params.pop('bd', None)
         hostname = params.pop('hostname', 'localhost')
         port = params.pop('port', None)
+        self._success = False
 
-        GABDSSHTunnel.__init__(self, hostname, port, **params)
+        if 'ssh_data' in params and params['ssh_data']:
+            GABDSSHTunnel.__init__(self, hostname, port, **params)
+        else:
+            self._local_port = port
+            self._context_mode = None
+            self._hostname = hostname
+            self._port = port
 
     @property
     def conn(self):
@@ -411,6 +429,9 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
     @property
     def server(self):
+        if getattr(self, "_ssh_data", None) is None:
+            return None
+
         ssh_data = self._ssh_data
         key = (ssh_data["ssh"], int(ssh_data["port"]), ssh_data["user"])
         return self._servers[key] if key in self._servers else None
@@ -475,6 +496,8 @@ class AbsConnection(ABC, GABDSSHTunnel):
         self._context_mode = None  # netegem
         # return False  # no suprimim excepcions
 
+    def __bool__(self):
+        return self._success
 
     def __str__(self):
         return f"Connexió a {self._hostname}:{self._port} amb l'usuari {self._user} a la base de dades "  # \
@@ -501,8 +524,10 @@ class AbsConnection(ABC, GABDSSHTunnel):
         """
 
         # si cal, obre el túnel SSH (mira si _ssh_data no és None)
-        if self._ssh_data is not None:
-            super().opentunnel()  # Obre el túnel SSH
+        # if getattr(self, "_ssh_data", None) is not None:
+        self._success = super().opentunnel()  # Obre el túnel SSH
+        #else:
+        #    self.server = None
 
         self._context_mode = "session"
         return self

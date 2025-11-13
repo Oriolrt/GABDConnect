@@ -88,7 +88,7 @@ class oracleConnection(AbsConnection):
 
           :return: bool
         """
-
+        #a = AbsConnection.open(self)
         if not AbsConnection.open(self):
             t = self.server
             raise RuntimeError(f"Could not open the SSH tunnel {t}. Check the connection parameters and its status.")
