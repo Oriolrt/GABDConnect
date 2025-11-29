@@ -474,13 +474,14 @@ class OracleConnectTestCase(unittest.TestCase):
         # Espera uns segons perquè estigui actiu
         time.sleep(2)
 
-        # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
-        print(f"Ara pots connectar-te a Oracle via {self.hostname}:{local_port}")
+
 
 
         hostname='localhost'
         port=local_port
 
+        # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
+        print(f"Ara pots connectar-te a Oracle via {hostname}:{port}")
         # Crear client Oracle amb túnel SSH
         with orcl(
             hostname=hostname,
