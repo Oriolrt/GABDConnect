@@ -5,6 +5,7 @@ from GABDConnect.ssh_tunnel import get_free_port
 from typing import Optional, List, Union
 import logging
 import os
+import subprocess
 
 USED_PORTS = set()
 
@@ -455,9 +456,32 @@ class OracleConnectTestCase(unittest.TestCase):
 
         """
 
-        hostname="localhost"
-        port=1521
 
+        local_port = get_unique_free_port(1521)
+        cmd = [
+            "ssh", "-T",
+            "-p", str(self.ssh_server['port']),
+            "-i", self.ssh_server['id_key'],
+            "-L", f"{local_port}:{self.hostname}:{self.port}",
+            f"{self.ssh_server['user']}@{self.ssh_server['ssh']}"
+        ]
+
+        # Obre el túnel en segon pla
+        proc = subprocess.Popen(cmd)
+
+        print("Túnel creat (PID {})".format(proc.pid))
+
+        # Espera uns segons perquè estigui actiu
+        time.sleep(2)
+
+
+
+
+        hostname='localhost'
+        port=local_port
+
+        # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
+        print(f"Ara pots connectar-te a Oracle via {hostname}:{port}")
         # Crear client Oracle amb túnel SSH
         with orcl(
             hostname=hostname,
@@ -471,7 +495,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
             self.assertTrue(
                 db.is_open,
-                f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
+                f"Should be able to connect to the Oracle database in {db} without SSH tunnel"
             )
 
             try:
@@ -488,6 +512,9 @@ class OracleConnectTestCase(unittest.TestCase):
                 self.fail(f"Failed to execute basic query: {e}")
 
         time.sleep(5)
+        # Quan vulguis tancar el túnel:
+        proc.terminate()
+
 
 if __name__ == '__main__':
     unittest.main()

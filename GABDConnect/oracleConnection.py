@@ -51,7 +51,10 @@ class oracleConnection(AbsConnection):
         params['port'] = params.pop('port', 1521)
 
         AbsConnection.__init__(self, **params)
-        self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
+        if params['ssh_data'] is None:
+            self._dsn = f"{self.user}/{self.pwd}@{self.hostname}:{self.port}/{self._serviceName}"
+        else:
+            self._dsn = f"{self.user}/{self.pwd}@localhost:{self._local_port}/{self._serviceName}"
 
         # mode = params.pop('mode', None)
 
