@@ -459,8 +459,9 @@ class OracleConnectTestCase(unittest.TestCase):
 
         local_port = get_unique_free_port(1521)
         cmd = [
-            "ssh",
+            "ssh", "-T",
             "-p", str(self.ssh_server['port']),
+            "-i", self.ssh_server['id_key'],
             "-L", f"{local_port}:{self.hostname}:{self.port}",
             f"{self.ssh_server['user']}@{self.ssh_server['ssh']}"
         ]
@@ -474,10 +475,10 @@ class OracleConnectTestCase(unittest.TestCase):
         time.sleep(2)
 
         # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
-        print("Ara pots connectar-te a Oracle via localhost:1521")
+        print(f"Ara pots connectar-te a Oracle via {self.hostname}:{local_port}")
 
 
-        hostname=self.hostname
+        hostname='localhost'
         port=local_port
 
         # Crear client Oracle amb túnel SSH
