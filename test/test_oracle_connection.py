@@ -495,7 +495,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
             self.assertTrue(
                 db.is_open,
-                f"Should be able to connect to the Oracle database in {db} through SSH tunnel"
+                f"Should be able to connect to the Oracle database in {db} without SSH tunnel"
             )
 
             try:
