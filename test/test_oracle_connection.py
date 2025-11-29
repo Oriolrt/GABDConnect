@@ -455,7 +455,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
         """
 
-        hostname="localhost"
+        hostname="oracle-1.grup00.gabd"
         port=1521
 
         # Crear client Oracle amb túnel SSH
