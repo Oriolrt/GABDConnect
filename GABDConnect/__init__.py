@@ -3,4 +3,4 @@ from .mongoConnection import mongoConnection
 from .AbsConnection import GABDSSHTunnel
 from .ssh_tunnel import get_free_port
 
-__version__ = "3.3.0"
+__version__ = "3.3.1"
