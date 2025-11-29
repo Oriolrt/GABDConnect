@@ -457,11 +457,11 @@ class OracleConnectTestCase(unittest.TestCase):
         """
 
 
-
+        local_port = get_unique_free_port(1521)
         cmd = [
             "ssh",
             "-p", str(self.ssh_server['port']),
-            "-L", f"1521:{self.hostname}:{self.port}",
+            "-L", f"{local_port}:{self.hostname}:{self.port}",
             f"{self.ssh_server['user']}@{self.ssh_server['ssh']}"
         ]
 
@@ -478,7 +478,7 @@ class OracleConnectTestCase(unittest.TestCase):
 
 
         hostname=self.hostname
-        port=self.port
+        port=local_port
 
         # Crear client Oracle amb túnel SSH
         with orcl(
