@@ -421,7 +421,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
     @property
     def conn(self):
-        return self._conn
+        return self._conn if self._conn is not None else None
 
     @conn.setter
     def conn(self, valor):
