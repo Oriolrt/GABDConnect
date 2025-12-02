@@ -202,9 +202,9 @@ class MongoConnectTestCase(unittest.TestCase):
 
         """
 
-        local_port = get_unique_free_port()
+        #local_port = get_unique_free_port()
         hostname='localhost'
-        port=local_port
+        port=local_port=27017
 
         cmd = [
             "ssh", "-T",
