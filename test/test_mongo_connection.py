@@ -53,13 +53,15 @@ class MongoConnectTestCase(unittest.TestCase):
         self.hostname = "localhost"
         self.port = 27017
         self.db = "test"
+        self.user="SYS"
+        self.pwd="SYS"
 
     def tearDown(self):
         # Aquí alliberes túnels després de cada test
         mongoConnection.close_all_tunnels()
 
     def test_mongoDB_default_connection(self):
-        with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:
+        with mongoConnection(user=self.user, pwd=self.pwd, hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:
             self.assertTrue(client.test_connection(), "La connexió ha fallat")
             self.assertIsNotNone(client.conn, "MongoDB client should be initialized")
             # Comprovem que la connexió es tanca correctament
@@ -70,7 +72,7 @@ class MongoConnectTestCase(unittest.TestCase):
 
     def test_mongoDB_local_port_connection(self):
         self.local_port = get_unique_free_port()
-        with  mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db,
+        with  mongoConnection(user=self.user, pwd=self.pwd, hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db,
                               local_port=self.local_port) as client:
             self.assertTrue(client.test_connection(), "La connexió ha fallat")
             self.assertIsNotNone(client.conn, "MongoDB client should be initialized")
@@ -82,7 +84,7 @@ class MongoConnectTestCase(unittest.TestCase):
 
     def test_mongoDB_tunnel_local_connection(self):
         self.hostname = "main.grup00.gabd"
-        with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:
+        with mongoConnection(user=self.user, pwd=self.pwd, hostname=self.hostname, port=self.port, ssh_data=self.ssh_server, db=self.db) as client:
             self.assertTrue(client.test_connection(), "La connexió ha fallat")
             db = client.conn[client.bd_name]
             self.assertIsNotNone(db,
@@ -101,7 +103,7 @@ class MongoConnectTestCase(unittest.TestCase):
                 {"name": "Pere", "surname": "Roca"},
                 {"name": "Anna", "surname": "Roca"}]
 
-        with mongoConnection(hostname=self.hostname, port=self.port, ssh_data=self.ssh_server,
+        with mongoConnection(user=self.user, pwd=self.pwd, hostname=self.hostname, port=self.port, ssh_data=self.ssh_server,
                              db=self.db, local_port=local_port) as client:
 
             db = client.conn[bd_name]
@@ -160,8 +162,8 @@ class MongoConnectTestCase(unittest.TestCase):
     def test_user_data_connection_with_authentication(self):
         self.hostname = "main.grup00.gabd"
         self.local_port = get_unique_free_port()
-        self.user = "gestorGeonames"
-        self.pwd = "gGeonames_pwd"
+        #self.user = "gestorGeonames"
+        #self.pwd = "gGeonames_pwd"
         self.bd = "Practica_3"
 
         try:
