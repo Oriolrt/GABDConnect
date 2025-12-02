@@ -3,6 +3,9 @@ from GABDConnect.mongoConnection import mongoConnection
 from GABDConnect.ssh_tunnel import get_free_port
 import os
 from pymongo.errors import OperationFailure
+import subprocess
+import time
+import subprocess
 
 USED_PORTS = {int(1521)}
 
@@ -191,6 +194,90 @@ class MongoConnectTestCase(unittest.TestCase):
             print("[WARN] Autenticació fallida o no activada...")
         except Exception as e:
             self.fail(f"Unexpected exception occurred: {e}")
+
+
+    def test_without_ssh_tunnel(self):
+        """
+        Obrir connexió directa sense necessitat de fer un tunnel ssh
+
+        """
+
+        local_port = get_unique_free_port()
+        hostname='localhost'
+        port=local_port
+
+        cmd = [
+            "ssh", "-T",
+            "-p", str(self.ssh_server['port']),
+            "-i", self.ssh_server['id_key'],
+            "-L", f"{local_port}:{self.hostname}:{self.port}",
+            f"{self.ssh_server['user']}@{self.ssh_server['ssh']}"
+        ]
+
+        # Obre el túnel en segon pla
+        proc = subprocess.Popen(cmd)
+
+        print("Túnel creat (PID {})".format(proc.pid))
+
+        # Espera uns segons perquè estigui actiu
+        time.sleep(2)
+
+
+        # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
+        print(f"Ara pots connectar-te a MongoDB via {hostname}:{local_port}")
+
+        bd_name = "test_mongo"
+        col_name = "col_test"
+
+        data = [{"name": "Oriol", "surname": "Ramos"},
+                {"name": "Pere", "surname": "Roca"},
+                {"name": "Anna", "surname": "Roca"}]
+
+        with mongoConnection(hostname=hostname, port=local_port,
+                             db=self.db) as client:
+
+            db = client.conn[bd_name]
+            # creeem una col·lecció si no existeix
+            try:
+                col = db[col_name]
+            except:
+                col = db.create_collection(col_name)
+
+            # Insertem dades a la col·lecció
+            col.insert_many(data)
+
+            try:
+                # Check if the data is inserted
+                self.assertEqual(
+                    3,
+                    col.count_documents({}),
+                    f"Should be able to insert data in the MongoDB database in {self.hostname} through SSH tunnel"
+                )
+
+            except AssertionError as e:
+                # Cleanup si el test falla
+                db.drop_collection(col_name)
+                raise e  # torna a llençar l'error perquè el test marqui com a fallit
+
+            # Fem una cerca ala col·lecció
+            for doc in col.find():
+                print(doc)
+
+            # Eliminem un document de la col·lecció
+            col.delete_one({"name": "Anna"})
+
+            # Eliminem la col·lecció
+            db.drop_collection(col_name)
+
+            tunnel = client.get_tunnel()
+
+        # Mantén el túnel obert durant un temps per a proves
+        time.sleep(5)
+        # Quan vulguis tancar el túnel:
+        proc.terminate()
+
+        # Comprovem que la connexió es tanca correctament
+        self.assertIsNone(tunnel, "Connexió hauria d'estar tancada")
 
 
 
