@@ -1,11 +1,16 @@
 import time
 import unittest
-from GABDConnect.oracleConnection import oracleConnection as orcl
+from GABDConnect.oracleConnection import oracleConnection as orcl, DatabaseError
 from GABDConnect.ssh_tunnel import get_free_port
 from typing import Optional, List, Union
 import logging
 import os
 import subprocess
+import socks
+import socket
+import sys
+import traceback
+
 
 USED_PORTS = set()
 
@@ -452,17 +457,19 @@ class OracleConnectTestCase(unittest.TestCase):
 
     def test_without_ssh_tunnel(self):
         """
-        Obrir connexió directa sense necessitat de fer un tunnel ssh
+        Obrir connexió directa sense necessitat de fer un tunnel ssh.
 
         """
 
+        port=1080
+        hostname = "oracle-1.grup00.gabd"
+        oracle_port = 1521
 
-        local_port = get_unique_free_port(1521)
         cmd = [
             "ssh", "-T",
             "-p", str(self.ssh_server['port']),
             "-i", self.ssh_server['id_key'],
-            "-L", f"{local_port}:{self.hostname}:{self.port}",
+            "-D", f"{port}",
             f"{self.ssh_server['user']}@{self.ssh_server['ssh']}"
         ]
 
@@ -474,46 +481,83 @@ class OracleConnectTestCase(unittest.TestCase):
         # Espera uns segons perquè estigui actiu
         time.sleep(2)
 
+        # --- 1) Configura SOCKS amb resolució remota ---
+        socks.set_default_proxy(socks.SOCKS5, "localhost", port, rdns=True)
+
+        # --- 2) Monkeypatch del socket per redirigir tot via SOCKS ---
+        original_socket_class = socket.socket
+        socket.socket = socks.socksocket
+
+        # --- 3) Monkeypatch de getaddrinfo per evitar resolució local ---
+        original_getaddrinfo = socket.getaddrinfo
+
+        def _fake_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+            # Retorna una entrada mínima que deixa passar el hostname sense resoldre
+            return [(socket.AF_INET, socket.SOCK_STREAM, proto, "", (host, port))]
+
+        socket.getaddrinfo = _fake_getaddrinfo
+
+        # --- 4) Timeout generós ---
+        socket.setdefaulttimeout(30)
+
+        connexio = None
+        try:
+            # Validació ràpida: TCP via SOCKS (ha d'anar bé)
+            s = socket.socket()
+            s.connect((hostname, oracle_port))
+            print(f"TCP via SOCKS OK a {hostname}:{oracle_port}")
+            s.close()
 
 
+            # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
+            print(f"Ara pots connectar-te a Oracle via {hostname}:{oracle_port}")
+            # Crear client Oracle amb túnel SSH
+            with orcl(
+                hostname=hostname,
+                port=oracle_port,
+                ssh_data=None,  # No SSH tunnel
+                user=self.user,
+                passwd=self.pwd,
+                local_port=None,  # No local port needed
+                serviceName=self.serviceName
+            ) as db:
 
-        hostname='localhost'
-        port=local_port
+                self.assertTrue(
+                    db.is_open,
+                    f"Should be able to connect to the Oracle database in {db} without SSH tunnel"
+                )
 
-        # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
-        print(f"Ara pots connectar-te a Oracle via {hostname}:{port}")
-        # Crear client Oracle amb túnel SSH
-        with orcl(
-            hostname=hostname,
-            port=port,
-            ssh_data=None,  # No SSH tunnel
-            user=self.user,
-            passwd=self.pwd,
-            local_port=None,  # No local port needed
-            serviceName=self.serviceName
-        ) as db:
+                try:
+                    # Executar consulta bàsica
+                    with db.cursor() as curs:
+                        curs.execute("""
+                                SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
+                                UNION
+                                SELECT 'Carles' AS nom, 'Sánchez' AS cognom FROM dual
+                            """)
+                        for row in curs:
+                            print(row)
+                except Exception as e:
+                    self.fail(f"Failed to execute basic query: {e}")
 
-            self.assertTrue(
-                db.is_open,
-                f"Should be able to connect to the Oracle database in {db} without SSH tunnel"
-            )
+            time.sleep(5)
+            # Quan vulguis tancar el túnel:
+            proc.terminate()
+        except DatabaseError as e:
+            print("Error de connexió Oracle:", e)
+            traceback.print_exc(file=sys.stdout)
 
-            try:
-                # Executar consulta bàsica
-                with db.cursor() as curs:
-                    curs.execute("""
-                            SELECT 'Oriol' AS nom, 'Ramos' AS cognom FROM dual
-                            UNION
-                            SELECT 'Carles' AS nom, 'Sánchez' AS cognom FROM dual
-                        """)
-                    for row in curs:
-                        print(row)
-            except Exception as e:
-                self.fail(f"Failed to execute basic query: {e}")
+        except Exception as e:
+            print(f"No s'ha pogut establir la connexió: {e}")
+            traceback.print_exc(file=sys.stdout)
 
-        time.sleep(5)
-        # Quan vulguis tancar el túnel:
-        proc.terminate()
+        finally:
+            # --- 5) Restaura els monkeypatches i tanca ---
+            socket.getaddrinfo = original_getaddrinfo
+            socket.socket = original_socket_class
+            #if connexio:
+            #    connexio.close()
+            #    print("Connexió tancada.")
 
 
 if __name__ == '__main__':

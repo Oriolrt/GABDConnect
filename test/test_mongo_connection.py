@@ -2,7 +2,14 @@ import unittest
 from GABDConnect.mongoConnection import mongoConnection
 from GABDConnect.ssh_tunnel import get_free_port
 import os
-from pymongo.errors import OperationFailure
+from pymongo.errors import OperationFailure, PyMongoError
+import socks
+import socket
+import sys
+import traceback
+import time
+import subprocess
+
 
 USED_PORTS = {int(1521)}
 
@@ -189,6 +196,103 @@ class MongoConnectTestCase(unittest.TestCase):
             print("[WARN] Autenticació fallida o no activada...")
         except Exception as e:
             self.fail(f"Unexpected exception occurred: {e}")
+
+    def test_without_ssh_tunnel(self):
+        """
+        Obrir connexió directa sense necessitat de fer un tunnel ssh.
+
+        """
+
+        port=1080
+        self.hostname = "main.grup00.gabd"
+        self.local_port = get_unique_free_port()
+        self.user = "gestorGeonames"
+        self.pwd = "grup00"
+        self.db_name = "Practica_3"
+        self.port = 27017
+        #self.db = "test"
+
+
+        cmd = [
+            "ssh", "-T",
+            "-p", str(self.ssh_server['port']),
+            "-i", self.ssh_server['id_key'],
+            "-D", f"{port}",
+            f"{self.ssh_server['user']}@{self.ssh_server['ssh']}"
+        ]
+
+        # Obre el túnel en segon pla
+        proc = subprocess.Popen(cmd)
+
+        print("Túnel creat (PID {})".format(proc.pid))
+
+        # Espera uns segons perquè estigui actiu
+        time.sleep(2)
+
+        # --- 1) Configura SOCKS amb resolució remota ---
+        socks.set_default_proxy(socks.SOCKS5, "localhost", port, rdns=True)
+
+        # --- 2) Monkeypatch del socket per redirigir tot via SOCKS ---
+        original_socket_class = socket.socket
+        socket.socket = socks.socksocket
+
+        # --- 3) Monkeypatch de getaddrinfo per evitar resolució local ---
+        original_getaddrinfo = socket.getaddrinfo
+
+        def _fake_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+            # Retorna una entrada mínima que deixa passar el hostname sense resoldre
+            return [(socket.AF_INET, socket.SOCK_STREAM, proto, "", (host, port))]
+
+        socket.getaddrinfo = _fake_getaddrinfo
+
+        # --- 4) Timeout generós ---
+        socket.setdefaulttimeout(30)
+
+        connexio = None
+        try:
+            # Validació ràpida: TCP via SOCKS (ha d'anar bé)
+            s = socket.socket()
+            s.connect((self.hostname, self.port))
+            print(f"TCP via SOCKS OK a {self.hostname}:{self.port}")
+            s.close()
+
+
+            # Aquí pots fer la connexió Oracle amb cx_Oracle o SQLAlchemy
+            print(f"Ara pots connectar-te a MongoDB via {self.hostname}:{self.port}")
+            # Crear client Oracle amb túnel SSH
+            with mongoConnection(
+                user=self.user,
+                pwd=self.pwd,
+                hostname=self.hostname,
+                port=self.port,
+                ssh_data=None, # No cal túnel SSH ja que ja estem fent SOCKS
+                local_port=None,  # No local port needed
+                db_name=self.db_name
+            ) as client:
+                db = client.conn[client.bd_name]
+                col = db["geonames"]
+                for doc in col.find().limit(10):
+                    print(doc)
+
+
+            time.sleep(5)
+            # Quan vulguis tancar el túnel:
+            proc.terminate()
+        except PyMongoError as e:
+            print("Error de connexió MongoDB:", e)
+            traceback.print_exc(file=sys.stdout)
+            self.AssertFail("No s'ha pogut connectar a MongoDB via túnel SSH")
+
+        except Exception as e:
+            print(f"No s'ha pogut establir la connexió: {e}")
+            traceback.print_exc(file=sys.stdout)
+            self.fail("No s'ha pogut connectar a MongoDB via túnel SSH")
+
+        finally:
+            # --- 5) Restaura els monkeypatches i tanca ---
+            socket.getaddrinfo = original_getaddrinfo
+            socket.socket = original_socket_class
+
 
 
 

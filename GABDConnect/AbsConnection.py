@@ -282,8 +282,8 @@ class GABDSSHTunnel:
         return tunnel.is_active() if tunnel else False
 
     def _make_key(self):
-        """Construeix la clau (ssh, port, user) a partir de self._ssh_data."""
-        if self._ssh_data is None:
+        """Construeix la clau (ssh, port, user) a partir de self._ssh_data, si existeix."""
+        if not hasattr(self, '_ssh_data') or self._ssh_data is None:
             print("[WARN] No hi ha dades SSH per construir la clau")
             return None
         return (
