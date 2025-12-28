@@ -167,8 +167,8 @@ class MongoConnectTestCase(unittest.TestCase):
     def test_user_data_connection_with_authentication(self):
         self.hostname = "main.grup00.gabd"
         self.local_port = get_unique_free_port()
-        self.user = "gestorGeonames"
-        self.pwd = "gGeonames_pwd"
+        #self.user = "gestorGeonames"
+        #self.pwd = "gGeonames_pwd"
         self.bd = "Practica_3"
 
         try:

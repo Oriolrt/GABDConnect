@@ -417,6 +417,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
             self._context_mode = None
             self._hostname = hostname
             self._port = port
+            self._ssh_data = None
 
     @property
     def conn(self):
