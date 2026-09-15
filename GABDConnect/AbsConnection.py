@@ -91,10 +91,16 @@ class GABDSSHTunnel:
             try:
                 self._local_port = int(kwargs.pop('local_port', {v[0]: k for k, v in a.items()}[self.hostname]))
             except KeyError:
+                # Abans es calculava un port lliure de reserva i tot seguit es llançava
+                # la mateixa KeyError, avortant sempre el constructor -- el missatge deia
+                # que s'agafaria un port per defecte però mai arribava a fer-ho servir.
                 self._local_port = get_free_port()
-                raise KeyError(
-                    f"""No s'ha definit un port local per redireccionar {self.hostname}:{self._port}. 
-                    S'agafarà {self._port} per defecte.""")
+                warnings.warn(
+                    f"No s'ha definit un port local per redireccionar {self.hostname}:{self._port}. "
+                    f"S'agafarà el port lliure {self._local_port} per defecte.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
             self._mt[self._local_port] = (self._hostname, self._port)
         else:
@@ -115,7 +121,7 @@ class GABDSSHTunnel:
 
     @server.setter
     def server(self, value):
-        _servers = value
+        GABDSSHTunnel._servers = value
 
     @property
     def hostname(self):
@@ -426,7 +432,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
     @conn.setter
     def conn(self, valor):
         self._conn = valor
-        self._is_open = True
+        self._is_open = valor is not None
 
     @property
     def server(self):
@@ -611,10 +617,24 @@ class AbsConnection(ABC, GABDSSHTunnel):
           --------
           None
         """
+        # El local_port del forward és el port local pel qual `client` s'ha connectat
+        # a 'localhost' dins openClientSSH() -- el recuperem de l'adreça remota del
+        # propi transport SSH en comptes d'exigir-lo com a paràmetre (remove_forward()
+        # SI que l'exigeix; sense això aquesta crida sempre petava amb TypeError).
+        local_port = None
+        transport = client.get_transport()
+        if transport is not None:
+            local_port = transport.getpeername()[1]
+
         client.close()
+
+        if local_port is None:
+            logging.warning("No s'ha pogut determinar el local_port del client SSH; no es tancarà cap forward.")
+            return
+
         tunel = self.get_tunnel()
-        # Cal recuperar el forward que s'ha obert
-        tunel.remove_forward()
+        if tunel is not None:
+            tunel.remove_forward(local_port)
 
     @abstractmethod
     def test_connection(self):

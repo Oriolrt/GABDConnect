@@ -306,8 +306,15 @@ class SSHTunnel:
 
             self.local_bind_addresses.pop(key_to_remove, None)
 
+            # Cal esborrar l'entrada de remote_bind_addresses que correspon REALMENT
+            # a aquest forward (server.remote_host/remote_port), no la primera que
+            # trobem -- abans es comparava key_to_remove[1] (que sempre és local_port)
+            # contra local_port, una condició sempre certa que esborrava sistemàticament
+            # l'índex 0, desalineant remote_bind_addresses de local_bind_addresses i
+            # fent que _check_existing_forward() retornés ports locals incorrectes
+            # per a un remote donat després d'uns quants add/remove.
             for i, (rhost, rport) in enumerate(self.remote_bind_addresses):
-                if key_to_remove[1] == local_port:
+                if rhost == server.remote_host and rport == server.remote_port:
                     self.remote_bind_addresses.pop(i)
                     break
 
