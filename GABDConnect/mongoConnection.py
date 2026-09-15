@@ -48,17 +48,32 @@ class mongoConnection(AbsConnection):
 
         self._auth_activated = self.user is not None and (isinstance(self.user,str) and len(self.user) > 0)
 
-        if not self._auth_activated:
-            self.dsn = f"mongodb://localhost:{self._local_port}/{self._auth_db}"
+        # Igual que oracleConnection: si no hi ha ssh_data, cal connectar directament a
+        # self.hostname:self.port -- abans es feia servir sempre "localhost:{_local_port}",
+        # ignorant l'hostname real quan no hi havia túnel SSH (connexions Mongo directes
+        # sempre acabaven intentant connectar a localhost). A més, `params['pwd']` no
+        # existia mai com a clau (AbsConnection.__init__ l'ha consumit com 'passwd', no
+        # 'pwd'), així que la branca amb autenticació sempre petava amb KeyError abans
+        # d'arribar-hi -- cal self.pwd (la property), no params['pwd'].
+        if not params.get('ssh_data'):
+            target = f"{self.hostname}:{self.port}"
         else:
-            self.dsn = f"mongodb://{params['user']}:{params['pwd']}@localhost:{self._local_port}/{self._auth_db}"
+            target = f"localhost:{self._local_port}"
+
+        if not self._auth_activated:
+            self.dsn = f"mongodb://{target}/{self._auth_db}"
+        else:
+            self.dsn = f"mongodb://{params['user']}:{self.pwd}@{target}/{self._auth_db}"
 
     @property
     def bd(self):
-        if not self.is_started:
+        # No existeix cap propietat `is_started` (ni `super().bd`, ja que AbsConnection
+        # no en defineix cap) -- accedir a .bd sempre petava amb AttributeError. `_bd`
+        # és l'atribut real que emplena open_session() (self.bd = self.conn[self.bd_name]).
+        if not self.is_open:
             self.startSession()
 
-        return super(mongoConnection, self).bd
+        return self._bd
 
     @bd.setter
     def bd(self, db):
@@ -177,7 +192,7 @@ class mongoConnection(AbsConnection):
             True si la sessió s'ha iniciat correctament, False en cas contrari.
         """
         self.open()
-        return self.is_started
+        return self.is_open
 
     def test_connection(self):
         """

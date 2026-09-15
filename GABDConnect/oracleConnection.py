@@ -151,7 +151,7 @@ class oracleConnection(AbsConnection):
         except AttributeError:
             logging.warning(f"Connexió a {self._dsn} tancada.")
         finally:
-            if self._context_mode is None or self._context_mode == "Tunnel":
+            if self._context_mode is None or self._context_mode == "tunnel":
                 self.closetunnel()
 
     def close_session(self) -> None:
