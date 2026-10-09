@@ -67,8 +67,8 @@ def forward_tunnel(local_port, remote_host, remote_port, transport):
 
 def main():
     # Connecta via SSH
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    from GABDConnect.ssh_tunnel import ssh_client_gateway
+    client = ssh_client_gateway()
 
     if SSH_KEY:
         client.connect(SSH_HOST, SSH_PORT, username=SSH_USER, key_filename=SSH_KEY)
