@@ -12,7 +12,53 @@ import time
 import logging
 from contextlib import closing
 from typing import Tuple, List, Optional, Dict, Any
+import os
+
 import paramiko
+
+# Claus d'host SSH dels gateways (p. ex. dcccluster.uab.cat:<port del grup>): a més de
+# ~/.ssh/known_hosts, es desen aquí la primera vegada que es veuen (trust on first use).
+GABD_KNOWN_HOSTS = os.path.expanduser(os.environ.get("GABD_KNOWN_HOSTS", "~/.ssh/known_hosts_gabd"))
+
+
+class TrustOnFirstUsePolicy(paramiko.MissingHostKeyPolicy):
+    """Desa la clau d'un host nou a GABD_KNOWN_HOSTS i continua. Si la clau d'un host ja
+    conegut ha canviat, paramiko llança BadHostKeyException abans d'arribar aquí."""
+
+    def missing_host_key(self, client, hostname, key):
+        client.get_host_keys().add(hostname, key.get_name(), key)
+        try:
+            os.makedirs(os.path.dirname(GABD_KNOWN_HOSTS), mode=0o700, exist_ok=True)
+            client.save_host_keys(GABD_KNOWN_HOSTS)
+        except OSError as e:
+            logging.getLogger(__name__).debug(f"No s'ha pogut desar la clau d'host: {e}")
+
+
+class AcceptViaVerifiedGatewayPolicy(paramiko.MissingHostKeyPolicy):
+    """Per a hosts als quals s'arriba per un túnel d'un gateway ja verificat (oracle-N, mongo-N
+    d'un grup): les seves claus canvien cada cop que es reconstrueixen els contenidors i la
+    confiança la dona el gateway, així que s'accepta la clau sense desar-la."""
+
+    def missing_host_key(self, client, hostname, key):
+        return None
+
+
+def ssh_client_gateway() -> paramiko.SSHClient:
+    """SSHClient per connectar a un gateway: verifica la clau contra ~/.ssh/known_hosts i
+    GABD_KNOWN_HOSTS i, si l'host és nou, la desa (trust on first use)."""
+    client = paramiko.SSHClient()
+    client.load_system_host_keys()
+    if os.path.exists(GABD_KNOWN_HOSTS):
+        client.load_host_keys(GABD_KNOWN_HOSTS)
+    client.set_missing_host_key_policy(TrustOnFirstUsePolicy())
+    return client
+
+
+def ssh_client_via_tunnel() -> paramiko.SSHClient:
+    """SSHClient per a un host al qual s'arriba pel túnel d'un gateway verificat."""
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(AcceptViaVerifiedGatewayPolicy())
+    return client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -353,8 +399,7 @@ class SSHTunnel:
             return
 
         try:
-            self.client = paramiko.SSHClient()
-            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            self.client = ssh_client_gateway()
             self.client.connect(
                 self.ssh_host,
                 port=self.ssh_port,

@@ -15,10 +15,9 @@ l'administració segura i eficient de bases de dades en entorns distribuïts.
 
 import warnings
 from abc import ABC, abstractmethod
-from .ssh_tunnel import SSHTunnel, get_free_port
+from .ssh_tunnel import SSHTunnel, get_free_port, ssh_client_via_tunnel
 from typing import Optional, Any, Union
 from paramiko.client import SSHClient
-from paramiko import WarningPolicy
 from getpass import getpass
 import logging
 from contextlib import contextmanager
@@ -182,10 +181,10 @@ class GABDSSHTunnel:
         # Configurar els binds remots i locals
         if getattr(self, "_mt", None) is not None:
             remote_binds = [(remote_host, remote_port) for _, (remote_host, remote_port) in self._mt.items()]
-            local_binds = [("", local_port) for local_port in self._mt.keys()]
+            local_binds = [("localhost", local_port) for local_port in self._mt.keys()]
         else:
             remote_binds = [(self._hostname, int(self._port))]
-            local_binds = [("", int(self._local_port))]
+            local_binds = [("localhost", int(self._local_port))]
 
 
         # Comprovar si ja existeix el túnel per aquest host
@@ -590,9 +589,7 @@ class AbsConnection(ABC, GABDSSHTunnel):
 
         tunel.add_forward( remote_host, remote_port,  local_port = local_port)
 
-        client = SSHClient()
-        client.load_system_host_keys()
-        client.set_missing_host_key_policy(WarningPolicy())
+        client = ssh_client_via_tunnel()
 
         try:
             client.connect('localhost', local_port, user, pwd)
